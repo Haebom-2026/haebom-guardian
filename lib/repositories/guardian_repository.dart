@@ -95,8 +95,8 @@ abstract class GuardianRepository {
   /// 현재 보호자가 볼 수 있는 도전 목록, 최신순 (실시간)
   Stream<List<Challenge>> watchChallenges();
 
-  /// 어르신께 도전 추천하기 (하실지는 어르신이 정한다)
-  Future<Challenge> suggestChallenge(String elderId, String templateId);
+  /// 어르신께 도전 보내기 (보호자가 직접 쓴 이름·도움말. 하실지는 어르신이 정한다)
+  Future<Challenge> suggestChallenge(String elderId, String title, {String hint = ''});
 
   /// 해낸 도전에 칭찬 보내기
   Future<void> cheerChallenge(String id, String message);

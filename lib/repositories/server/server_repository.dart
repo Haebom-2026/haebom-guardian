@@ -356,7 +356,7 @@ class ServerGuardianRepository implements GuardianRepository {
   Stream<List<Challenge>> watchChallenges() => Stream.value(const []);
 
   @override
-  Future<Challenge> suggestChallenge(String elderId, String templateId) =>
+  Future<Challenge> suggestChallenge(String elderId, String title, {String hint = ''}) =>
       Future.error(const RepositoryException(RepositoryErrorCode.unavailable, '서버에 도전 기능 없음'));
 
   @override

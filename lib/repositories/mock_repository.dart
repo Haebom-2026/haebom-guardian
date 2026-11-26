@@ -79,8 +79,8 @@ class MockGuardianRepository implements GuardianRepository {
   Stream<List<Challenge>> watchChallenges() => _watch(() => backend.challengesFor(guardianId));
 
   @override
-  Future<Challenge> suggestChallenge(String elderId, String templateId) =>
-      _call(() => backend.suggestChallenge(guardianId, elderId, templateId));
+  Future<Challenge> suggestChallenge(String elderId, String title, {String hint = ''}) =>
+      _call(() => backend.suggestChallenge(guardianId, elderId, title, hint: hint));
 
   @override
   Future<void> cheerChallenge(String id, String message) =>

@@ -116,8 +116,8 @@ class GuardianStore extends ChangeNotifier {
   List<Challenge> challengesFor({String? elderId}) =>
       challenges.where((c) => _matches(c.elderId, elderId)).toList();
 
-  Future<Challenge> suggestChallenge(String elderId, String templateId) =>
-      repository.suggestChallenge(elderId, templateId);
+  Future<Challenge> suggestChallenge(String elderId, String title, {String hint = ''}) =>
+      repository.suggestChallenge(elderId, title, hint: hint);
 
   Future<void> cheerChallenge(String id, String message) => repository.cheerChallenge(id, message);
 

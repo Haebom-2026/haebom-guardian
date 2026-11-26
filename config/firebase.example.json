@@ -1,0 +1,17 @@
+{
+  "BACKEND": "server",
+
+  "FIREBASE_PROJECT_ID": "팀원이 공유한 프로젝트 ID",
+  "FIREBASE_MESSAGING_SENDER_ID": "프로젝트 번호(숫자)",
+  "FIREBASE_STORAGE_BUCKET": "",
+
+  "FIREBASE_ANDROID_API_KEY": "google-services.json 의 api_key.current_key",
+  "FIREBASE_ANDROID_APP_ID": "1:000000000000:android:xxxxxxxx (com.yju.haebom.guardian_app 등록 후)",
+
+  "FIREBASE_IOS_API_KEY": "GoogleService-Info.plist 의 API_KEY",
+  "FIREBASE_IOS_APP_ID": "1:000000000000:ios:xxxxxxxx (com.yju.haebom.guardianApp 등록 후)",
+  "FIREBASE_IOS_BUNDLE_ID": "com.yju.haebom.guardianApp",
+
+  "SERVER_BASE_URL": "공통 서버 주소 (서버 담당에게 받은 dev 주소, 예: https://xxxx.execute-api.ap-northeast-2.amazonaws.com)",
+  "SERVER_CONFIG_DOC": "config/server"
+}

@@ -19,6 +19,7 @@ import 'repositories/server/api_link_feed.dart';
 import 'repositories/server/guardian_server_api.dart';
 import 'repositories/server/server_repository.dart';
 import 'repositories/server/server_url.dart';
+import 'screens/onboarding/notification_permission.dart';
 import 'services/notification_service.dart';
 import 'services/profile_registrar.dart';
 import 'services/push_service.dart';
@@ -52,7 +53,7 @@ Future<void> _runWithMock() async {
 
   // 첫 화면이 그려진 뒤 권한 요청 및 "알림으로 앱이 실행된 경우" 처리
   WidgetsBinding.instance.addPostFrameCallback((_) async {
-    await deps.notifications.requestPermission();
+    await showNotificationIntroIfNeeded(deps);
     final launch = await deps.notifier.launchTarget();
     if (launch != null) AppRoutes.openTarget(deps.navigatorKey.currentState, launch);
   });
@@ -152,6 +153,10 @@ Future<void> _runWithServer(BackendConfig config) async {
     onContentChanged: () => unawaited(repository.notificationFeed?.refresh()),
   );
   deps.push = push;
+  // 홈 안내나 설정에서 알림을 켰으면 FCM 기기 등록을 이어 간다
+  deps.notifications.permission.addListener(() {
+    if (deps.notifications.permission.value == true) unawaited(push.retry());
+  });
   // 서버 규격상 기기 등록 전에 보호자 프로필이 필요하다. 서버가 꺼져 있어도 앱은 계속 동작하고,
   // 등록될 때까지 점점 긴 간격으로 다시 시도한다. 성공하면 실패했던 FCM 토큰 등록도 다시 해 본다.
   final profile = ProfileRegistrar(
@@ -184,7 +189,7 @@ Future<void> _runWithServer(BackendConfig config) async {
   runApp(HaebomFamilyApp(deps: deps));
 
   WidgetsBinding.instance.addPostFrameCallback((_) async {
-    await deps.notifications.requestPermission();
+    await showNotificationIntroIfNeeded(deps);
     final launch = await deps.notifier.launchTarget();
     if (launch != null) open(launch);
     await profile.start();
@@ -196,7 +201,7 @@ Future<void> _runWithServer(BackendConfig config) async {
 Future<String?> _debugFcmToken(PluginLocalNotifier notifier) async {
   await notifier.requestPermission();
   final m = FirebasePushMessaging();
-  if (!await m.requestPermission()) return null;
+  if (!await m.checkPermission()) return null;
   final token = await m.getToken();
   debugPrint('FCM 등록 토큰 (테스트용): $token');
   return token;

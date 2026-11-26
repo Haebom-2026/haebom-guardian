@@ -35,7 +35,8 @@ class PushMessage {
 
 /// FirebaseMessaging 추상화 (테스트에서 가짜 구현 사용)
 abstract class PushMessaging {
-  Future<bool> requestPermission();
+  /// 알림 권한이 허용되어 있는지 확인만 한다 (권한 창은 앱 시작 안내 화면에서 로컬 알림 쪽이 띄운다).
+  Future<bool> checkPermission();
   Future<String?> getToken();
   Stream<String> get onTokenRefresh;
   Stream<PushMessage> get onForegroundMessage;
@@ -60,9 +61,10 @@ class FirebasePushMessaging implements PushMessaging {
         body: m.notification?.body,
       );
 
+  /// Android에서 `requestPermission`을 다시 부르면 방금 거절한 권한 창이 한 번 더 뜨므로 설정 값만 읽는다.
   @override
-  Future<bool> requestPermission() async {
-    final s = await _m.requestPermission(alert: true, badge: true, sound: true);
+  Future<bool> checkPermission() async {
+    final s = await _m.getNotificationSettings();
     return s.authorizationStatus == AuthorizationStatus.authorized ||
         s.authorizationStatus == AuthorizationStatus.provisional;
   }
@@ -199,7 +201,7 @@ class PushService extends ChangeNotifier {
     final t = initial?.target;
     if (t != null) onOpen(t);
 
-    if (!await messaging.requestPermission()) return _set(PushState.permissionDenied);
+    if (!await messaging.checkPermission()) return _set(PushState.permissionDenied);
     final String? token;
     try {
       token = await messaging.getToken();
@@ -215,6 +217,8 @@ class PushService extends ChangeNotifier {
   /// 서버 등록 재시도 (설정 화면 버튼, 앱이 다시 앞으로 왔을 때)
   Future<void> retry() async {
     if (state == PushState.active || state == PushState.idle) return;
+    // 휴대폰 설정에서 알림을 켜고 돌아온 경우에만 등록을 이어 간다
+    if (state == PushState.permissionDenied && !await messaging.checkPermission()) return;
     final token = await messaging.getToken().catchError((Object _) => null);
     if (token != null) await _register(token);
   }
@@ -225,6 +229,7 @@ class PushService extends ChangeNotifier {
       await api.registerDevice(deviceId: await deviceId(), fcmToken: token, platform: platform);
       _set(PushState.active);
     } catch (e) {
+      if (kDebugMode) debugPrint('FCM 기기 등록 실패: $e');
       _set(PushState.registerFailed, '$e');
     }
   }

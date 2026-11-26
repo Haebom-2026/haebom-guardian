@@ -20,7 +20,7 @@ class FakeMessaging implements PushMessaging {
   bool deleted = false;
 
   @override
-  Future<bool> requestPermission() async => permission;
+  Future<bool> checkPermission() async => permission;
   @override
   Future<String?> getToken() async => token;
   @override
@@ -92,6 +92,17 @@ void main() {
       expect(api.calls, isEmpty);
       expect(push.state, PushState.permissionDenied);
       expect(env.deps.notifications.remotePushActive, isFalse);
+    });
+
+    test('권한 거부 후 휴대폰 설정에서 켜고 돌아오면 등록을 이어 간다 (꺼진 채로는 다시 묻지 않음)', () async {
+      messaging.permission = false;
+      await push.start();
+      await push.retry();
+      expect(api.calls, isEmpty, reason: '아직 꺼져 있으면 등록하지 않음');
+      messaging.permission = true;
+      await push.retry();
+      expect(api.calls, ['register:device-1:fcm-token-1:android']);
+      expect(push.state, PushState.active);
     });
 
     test('iPhone처럼 토큰이 없으면(APNs 미설정) 로컬 알림 경로 유지', () async {

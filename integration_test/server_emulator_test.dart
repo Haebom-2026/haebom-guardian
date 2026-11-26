@@ -41,6 +41,10 @@ class _RecordingNotifier implements LocalNotifier {
   @override
   Future<bool> requestPermission() async => true; // 권한 팝업이 테스트를 멈추지 않도록
   @override
+  Future<bool> isPermissionGranted() async => true;
+  @override
+  Future<void> openSettings() async {}
+  @override
   Future<void> show(LocalAlert alert) {
     shown.add(alert);
     return _inner.show(alert);

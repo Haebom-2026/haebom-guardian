@@ -23,6 +23,11 @@ class FakeNotifier implements LocalNotifier {
   @override
   Future<bool> requestPermission() async => granted;
   @override
+  Future<bool> isPermissionGranted() async => granted;
+  int settingsOpened = 0;
+  @override
+  Future<void> openSettings() async => settingsOpened++;
+  @override
   Future<void> show(LocalAlert alert) async => shown.add(alert);
   @override
   Future<AlertTarget?> launchTarget() async => null;

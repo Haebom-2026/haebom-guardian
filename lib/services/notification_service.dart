@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../controllers/guardian_store.dart';
@@ -59,6 +60,12 @@ class LocalAlert {
 abstract class LocalNotifier {
   Future<void> initialize(void Function(AlertTarget target) onTap);
   Future<bool> requestPermission();
+
+  /// 권한 창을 띄우지 않고 지금 알림이 허용되어 있는지만 확인한다
+  Future<bool> isPermissionGranted();
+
+  /// 휴대폰 설정의 이 앱 알림 화면을 연다 (권한 창을 더 띄울 수 없을 때)
+  Future<void> openSettings();
   Future<void> show(LocalAlert alert);
 
   /// 앱이 종료된 상태에서 알림을 눌러 실행된 경우의 대상
@@ -70,6 +77,10 @@ class NoopLocalNotifier implements LocalNotifier {
   Future<void> initialize(void Function(AlertTarget target) onTap) async {}
   @override
   Future<bool> requestPermission() async => false;
+  @override
+  Future<bool> isPermissionGranted() async => false;
+  @override
+  Future<void> openSettings() async {}
   @override
   Future<void> show(LocalAlert alert) async {}
   @override
@@ -142,6 +153,32 @@ class PluginLocalNotifier implements LocalNotifier {
       return await ios?.requestPermissions(alert: true, badge: true, sound: true) ?? false;
     }
     return false;
+  }
+
+  @override
+  Future<bool> isPermissionGranted() async {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      return await android?.areNotificationsEnabled() ?? false;
+    }
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      final ios = _plugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+      return (await ios?.checkPermissions())?.isEnabled ?? false;
+    }
+    return false;
+  }
+
+  static const _settingsChannel = MethodChannel('haebom/settings');
+
+  @override
+  Future<void> openSettings() async {
+    try {
+      await _settingsChannel.invokeMethod<void>('openNotificationSettings');
+    } on PlatformException catch (e) {
+      debugPrint('알림 설정 화면 열기 실패: $e');
+    } on MissingPluginException {
+      // 테스트·지원하지 않는 플랫폼
+    }
   }
 
   @override
@@ -221,6 +258,9 @@ class NotificationService {
   bool _permissionGranted = false;
   bool get permissionGranted => _permissionGranted;
 
+  /// 알림 권한 상태 (null: 아직 확인 전). 홈의 "알림이 꺼져 있어요" 안내가 듣는다.
+  final ValueNotifier<bool?> permission = ValueNotifier(null);
+
   /// 기존 데이터는 알림으로 띄우지 않기 위해 첫 로딩 시점의 id를 기록한다.
   void start() {
     store.addListener(_onStoreChanged);
@@ -229,7 +269,23 @@ class NotificationService {
 
   Future<bool> requestPermission() async {
     _permissionGranted = await notifier.requestPermission();
+    permission.value = _permissionGranted;
     return _permissionGranted;
+  }
+
+  /// 권한 창 없이 지금 상태만 다시 읽는다 (앱 복귀 시: 휴대폰 설정에서 바꿨을 수 있음)
+  Future<bool> refreshPermission() async {
+    _permissionGranted = await notifier.isPermissionGranted();
+    permission.value = _permissionGranted;
+    return _permissionGranted;
+  }
+
+  /// 알림 켜기: 권한 창을 다시 띄울 수 있으면 띄우고, 이미 막혔으면 휴대폰 설정 화면을 연다.
+  /// 설정 화면을 열었으면 true (돌아왔을 때 [refreshPermission]으로 다시 확인).
+  Future<bool> turnOn() async {
+    if (await requestPermission()) return false;
+    await notifier.openSettings();
+    return true;
   }
 
   void _onStoreChanged() {

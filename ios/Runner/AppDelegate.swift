@@ -14,5 +14,19 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    // 알림 권한을 앱에서 더 물어볼 수 없을 때 설정 앱의 이 앱 알림 화면을 연다
+    guard let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "HaebomSettings") else { return }
+    FlutterMethodChannel(name: "haebom/settings", binaryMessenger: registrar.messenger())
+      .setMethodCallHandler { call, result in
+        guard call.method == "openNotificationSettings" else { return result(FlutterMethodNotImplemented) }
+        let target: String
+        if #available(iOS 16.0, *) {
+          target = UIApplication.openNotificationSettingsURLString
+        } else {
+          target = UIApplication.openSettingsURLString
+        }
+        if let url = URL(string: target) { UIApplication.shared.open(url) }
+        result(nil)
+      }
   }
 }

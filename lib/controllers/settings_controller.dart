@@ -52,12 +52,14 @@ class SettingsController extends ChangeNotifier {
   static const kApproval = 'approvalAlerts';
   static const kSos = 'sosAlerts';
   static const kBrief = 'briefNotifications';
-  static const keys = [kActivity, kApproval, kSos, kBrief];
+  static const kIntroDone = 'notificationIntroDone';
+  static const keys = [kActivity, kApproval, kSos, kBrief, kIntroDone];
 
   bool _activityAlerts = true;
   bool _approvalAlerts = true;
   bool _sosAlerts = true;
   bool _briefNotifications = false;
+  bool _notificationIntroDone = false;
 
   /// 민감 앱 이용/도움 필요 알림
   bool get activityAlerts => _activityAlerts;
@@ -77,6 +79,10 @@ class SettingsController extends ChangeNotifier {
   set sosAlerts(bool v) => _set(kSos, v, () => _sosAlerts = v);
   set briefNotifications(bool v) => _set(kBrief, v, () => _briefNotifications = v);
 
+  /// 첫 실행 알림 안내 화면을 이미 보여 줬는지 (한 번만 보여 준다. 이후에는 홈의 "알림이 꺼져 있어요" 안내로)
+  bool get notificationIntroDone => _notificationIntroDone;
+  set notificationIntroDone(bool v) => _set(kIntroDone, v, () => _notificationIntroDone = v);
+
   /// 저장된 값을 불러온다. 읽기에 실패하면 기본값을 유지한다.
   Future<void> load() async {
     final Map<String, bool> saved;
@@ -90,6 +96,7 @@ class SettingsController extends ChangeNotifier {
     _approvalAlerts = saved[kApproval] ?? _approvalAlerts;
     _sosAlerts = saved[kSos] ?? _sosAlerts;
     _briefNotifications = saved[kBrief] ?? _briefNotifications;
+    _notificationIntroDone = saved[kIntroDone] ?? _notificationIntroDone;
     notifyListeners();
   }
 

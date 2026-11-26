@@ -66,10 +66,14 @@ class SettingsScreen extends StatelessWidget {
                   subtitle: const Text('알림이 오지 않을 때 눌러 주세요'),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () async {
-                    final granted = await deps.notifications.requestPermission();
-                    if (context.mounted) {
-                      showMessage(context, granted ? '알림 권한이 허용되어 있습니다.' : '알림 권한이 꺼져 있습니다. 휴대폰 설정에서 허용해 주세요.');
+                    final n = deps.notifications;
+                    if (await n.refreshPermission()) {
+                      if (context.mounted) showMessage(context, '알림 권한이 허용되어 있습니다.');
+                      return;
                     }
+                    // 권한 창을 다시 띄울 수 있으면 띄우고, 막혔으면 휴대폰 설정의 알림 화면을 연다
+                    final openedSettings = await n.turnOn();
+                    if (!openedSettings && context.mounted) showMessage(context, '알림을 켰습니다.');
                   },
                 ),
               ]),

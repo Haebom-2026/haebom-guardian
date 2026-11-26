@@ -16,20 +16,23 @@ class GuardianStore extends ChangeNotifier {
     _subs = [
       repository.watchLinks().listen((v) {
         links = v;
+        _errors.remove(_Feed.links); // 자동 재연결로 다시 받으면 이 구독의 이전 오류는 지운다
         _linksLoaded = true;
         _fixSelection();
         notifyListeners();
-      }, onError: _onError),
+      }, onError: (Object e) => _onError(_Feed.links, e)),
       repository.watchNotifications().listen((v) {
         notifications = v;
+        _errors.remove(_Feed.notifications);
         _notificationsLoaded = true;
         notifyListeners();
-      }, onError: _onError),
+      }, onError: (Object e) => _onError(_Feed.notifications, e)),
       repository.watchApprovals().listen((v) {
         approvals = v;
+        _errors.remove(_Feed.approvals);
         _approvalsLoaded = true;
         notifyListeners();
-      }, onError: _onError),
+      }, onError: (Object e) => _onError(_Feed.approvals, e)),
     ];
   }
 
@@ -39,7 +42,9 @@ class GuardianStore extends ChangeNotifier {
   List<FamilyLink> links = const [];
   List<NotificationItem> notifications = const [];
   List<ApprovalRequest> approvals = const [];
-  Object? lastError;
+  /// 구독별 마지막 오류. 그 구독이 다시 데이터를 받으면 지운다 (다른 구독의 데이터로는 지우지 않는다).
+  final Map<_Feed, Object> _errors = {};
+  Object? get lastError => _errors.isEmpty ? null : _errors.values.last;
 
   bool _linksLoaded = false;
   bool _notificationsLoaded = false;
@@ -61,8 +66,8 @@ class GuardianStore extends ChangeNotifier {
     }
   }
 
-  void _onError(Object e) {
-    lastError = e;
+  void _onError(_Feed feed, Object e) {
+    _errors[feed] = e;
     notifyListeners();
   }
 
@@ -116,3 +121,5 @@ class GuardianStore extends ChangeNotifier {
     super.dispose();
   }
 }
+
+enum _Feed { links, notifications, approvals }

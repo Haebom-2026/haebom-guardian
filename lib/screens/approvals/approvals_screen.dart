@@ -9,7 +9,7 @@ import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
 
 /// 도우미 진행 승인: 맨 위 "응답이 필요한 요청"(주황 상자, 남은 시간 · 요청 확인하기),
-/// 아래 "지난 요청"(승인 완료·거절·응답 시간 지남·요청 취소됨, 아이콘 + 글자). 응답은 상세 화면에서 한다.
+/// 아래 "지난 요청" 흰 카드(승인 완료·거절·응답 시간 지남·요청 취소됨, 아이콘 + 글자). 응답은 상세 화면에서 한다.
 class ApprovalsScreen extends StatelessWidget {
   const ApprovalsScreen({super.key});
 
@@ -50,7 +50,7 @@ class ApprovalsScreen extends StatelessWidget {
                 else
                   for (final a in pending)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(Space.page, 0, Space.page, Space.gap),
+                      padding: const EdgeInsets.fromLTRB(Space.page - 4, 0, Space.page - 4, Space.gap),
                       child: HelpCard(
                         key: ValueKey('pending_${a.id}'),
                         tone: RiskTone.caution,
@@ -63,9 +63,8 @@ class ApprovalsScreen extends StatelessWidget {
                         onPressed: () => open(a),
                       ),
                     ),
-                // 과거 처리 기록은 회색 띠로 현재 요청과 분리
-                const SizedBox(height: Space.section),
-                Container(height: 8, color: k.subtle),
+                // 과거 처리 기록은 별도 섹션의 흰 카드로 현재 요청과 분리
+                const SizedBox(height: 8),
                 SectionHeader('지난 요청', count: past.isEmpty ? null : past.length),
                 if (past.isEmpty)
                   Padding(
@@ -73,10 +72,12 @@ class ApprovalsScreen extends StatelessWidget {
                     child: Text('지난 승인 요청이 없습니다.', style: t.textTheme.bodySmall),
                   )
                 else
-                  for (final (i, a) in past.indexed) ...[
-                    if (i > 0) const RowDivider(),
-                    ApprovalCard(request: a, store: store, onTap: () => open(a)),
-                  ],
+                  CardGroup(children: [
+                    for (final (i, a) in past.indexed) ...[
+                      if (i > 0) const RowDivider(),
+                      ApprovalCard(request: a, store: store, onTap: () => open(a)),
+                    ],
+                  ]),
               ],
             );
           }),

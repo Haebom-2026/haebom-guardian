@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 
 import '../../app/dependencies.dart';
+import '../../app/theme.dart';
 import '../../repositories/guardian_repository.dart';
 
 class ConnectFamilyScreen extends StatefulWidget {
@@ -71,107 +72,211 @@ class _ConnectFamilyScreenState extends State<ConnectFamilyScreen> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
+    final k = HaebomTokens.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('가족 연결')),
       body: SafeArea(
         top: false,
-        child: ListView(
-          padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('연결 코드 입력', style: t.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 6),
-            Text(
-              '가족의 해봄 앱에서 [가족 연결]을 누르면 6자리 숫자 코드가 표시됩니다. '
-              '코드는 10분 동안 한 번만 사용할 수 있습니다.',
-              style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              key: const Key('connect_code_field'),
-              controller: _code,
-              autofocus: true,
-              keyboardType: TextInputType.number,
-              textAlign: TextAlign.center,
-              maxLength: 6,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              style: t.textTheme.headlineMedium?.copyWith(letterSpacing: 10, fontWeight: FontWeight.w700),
-              decoration: InputDecoration(
-                hintText: '000000',
-                counterText: '',
-                errorText: _error,
-                errorMaxLines: 3,
-              ),
-              onChanged: (_) => setState(() => _error = null),
-              onSubmitted: (_) => _submit(),
-            ),
-            const SizedBox(height: 24),
-            Text('가족을 부르는 호칭', style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 4),
-            Text('이 앱의 알림에 표시됩니다. 예) 어머니가 정부24를 사용하려고 합니다.',
-                style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final r in _relations)
-                  ChoiceChip(
-                    label: Text(r),
-                    selected: _relation == r,
-                    key: Key('elder_label_$r'),
-                    onSelected: (_) => setState(() => _relation = r),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(Space.page + 4, 8, Space.page + 4, Space.page),
+                children: [
+                  Text(
+                    '가족 휴대폰에 보이는\n연결 코드를 입력해 주세요',
+                    style: t.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700, height: 1.4),
                   ),
-              ],
-            ),
-            if (_relation == '기타') ...[
-              const SizedBox(height: 12),
-              TextField(
-                controller: _customRelation,
-                maxLength: 10,
-                decoration: const InputDecoration(labelText: '호칭 입력 (예: 이모)'),
-                onChanged: (_) => setState(() {}),
-              ),
-            ],
-            const SizedBox(height: 24),
-            Text('가족이 나를 부르는 호칭', style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 4),
-            Text('가족의 해봄 앱 안내에 쓰입니다. 예) 딸에게 알림을 보냈어요.',
-                style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final r in _guardianRelations)
-                  ChoiceChip(
-                    key: Key('guardian_label_$r'),
-                    label: Text(r),
-                    selected: _guardianRelation == r,
-                    onSelected: (_) => setState(() => _guardianRelation = r),
+                  const SizedBox(height: 8),
+                  Text(
+                    '가족의 해봄 앱에서 [가족 연결]을 누르면 6자리 숫자가 나와요. 10분 동안 한 번만 쓸 수 있어요.',
+                    style: t.textTheme.bodyMedium?.copyWith(color: k.textSub),
                   ),
-              ],
-            ),
-            if (_guardianRelation == '기타') ...[
-              const SizedBox(height: 12),
-              TextField(
-                key: const Key('guardian_label_custom'),
-                controller: _customGuardianRelation,
-                maxLength: 10,
-                decoration: const InputDecoration(labelText: '호칭 입력 (예: 조카)'),
-                onChanged: (_) => setState(() {}),
+                  const SizedBox(height: Space.section),
+                  _CodeBoxes(controller: _code, hasError: _error != null, onChanged: () => setState(() => _error = null), onSubmitted: _submit),
+                  if (_error != null) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.error_outline_rounded, size: 20, color: t.colorScheme.error),
+                        const SizedBox(width: 6),
+                        Expanded(child: Text(_error!, style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.error))),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 32),
+                  Text('이 가족을 뭐라고 부르나요?', style: t.textTheme.titleMedium),
+                  const SizedBox(height: 4),
+                  Text('이 앱의 알림에 표시돼요. 예) 어머니가 정부24를 사용하려고 합니다.', style: t.textTheme.bodySmall),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final r in _relations)
+                        _chip(context, r, _relation == r, Key('elder_label_$r'), () => setState(() => _relation = r)),
+                    ],
+                  ),
+                  if (_relation == '기타') ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _customRelation,
+                      maxLength: 10,
+                      decoration: const InputDecoration(labelText: '호칭 입력 (예: 이모)'),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ],
+                  const SizedBox(height: 28),
+                  Text('가족은 나를 뭐라고 부르나요?', style: t.textTheme.titleMedium),
+                  const SizedBox(height: 4),
+                  Text('가족의 해봄 앱 안내에 쓰여요. 예) 딸에게 알림을 보냈어요.', style: t.textTheme.bodySmall),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final r in _guardianRelations)
+                        _chip(context, r, _guardianRelation == r, Key('guardian_label_$r'),
+                            () => setState(() => _guardianRelation = r)),
+                    ],
+                  ),
+                  if (_guardianRelation == '기타') ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      key: const Key('guardian_label_custom'),
+                      controller: _customGuardianRelation,
+                      maxLength: 10,
+                      decoration: const InputDecoration(labelText: '호칭 입력 (예: 조카)'),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ],
+                ],
               ),
-            ],
-            const SizedBox(height: 28),
-            FilledButton(
-              key: const Key('connect_submit'),
-              onPressed: _canSubmit ? _submit : null,
-              child: _submitting
-                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5))
-                  : const Text('연결하기'),
+            ),
+            // 아래 고정: 연결하기
+            Padding(
+              padding: const EdgeInsets.fromLTRB(Space.page, 8, Space.page, Space.page),
+              child: FilledButton(
+                key: const Key('connect_submit'),
+                onPressed: _canSubmit ? _submit : null,
+                child: _submitting
+                    ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5))
+                    : const Text('연결하기'),
+              ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  /// 호칭 칩: 선택되면 녹색 테두리 + 연한 녹색 바탕 + 굵은 녹색 글자
+  Widget _chip(BuildContext context, String label, bool selected, Key key, VoidCallback onTap) {
+    final k = HaebomTokens.of(context);
+    return ChoiceChip(
+      key: key,
+      label: Text(label),
+      selected: selected,
+      showCheckmark: false,
+      backgroundColor: k.card,
+      selectedColor: k.positiveBg,
+      side: BorderSide(color: selected ? k.primary : k.divider, width: 1.5),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      labelStyle: TextStyle(
+        fontSize: 16,
+        fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+        color: selected ? k.primary : k.text,
+      ),
+      onSelected: (_) => onTap(),
+    );
+  }
+}
+
+/// 6칸 코드 입력. 실제 입력은 위에 겹친 투명한 TextField 하나가 받는다 (붙여넣기·자동 채우기·낭독 그대로 동작).
+class _CodeBoxes extends StatelessWidget {
+  const _CodeBoxes({required this.controller, required this.hasError, required this.onChanged, required this.onSubmitted});
+  final TextEditingController controller;
+  final bool hasError;
+  final VoidCallback onChanged;
+  final VoidCallback onSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final k = HaebomTokens.of(context);
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller,
+      builder: (context, v, _) {
+        final text = v.text;
+        return Stack(
+          children: [
+            ExcludeSemantics(
+              child: Row(
+                children: [
+                  for (var i = 0; i < 6; i++) ...[
+                    if (i > 0) const SizedBox(width: 8),
+                    Expanded(
+                      child: Container(
+                        height: 60,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: i < text.length ? k.card : k.subtle,
+                          borderRadius: BorderRadius.circular(Space.radius),
+                          border: Border.all(
+                            width: 1.5,
+                            color: hasError
+                                ? t.colorScheme.error
+                                : i == text.length
+                                    ? k.primary
+                                    : i < text.length
+                                        ? k.text
+                                        : k.divider,
+                          ),
+                        ),
+                        child: FittedBox(
+                          child: Text(
+                            i < text.length ? text[i] : '',
+                            style: t.textTheme.headlineSmall?.copyWith(fontSize: 26),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Positioned.fill(
+              child: TextField(
+                key: const Key('connect_code_field'),
+                controller: controller,
+                autofocus: true,
+                keyboardType: TextInputType.number,
+                autofillHints: const [AutofillHints.oneTimeCode],
+                maxLength: 6,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                showCursor: false,
+                enableInteractiveSelection: false,
+                style: const TextStyle(color: Colors.transparent, fontSize: 1),
+                decoration: const InputDecoration(
+                  filled: false,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  counterText: '',
+                  labelText: '연결 코드 6자리',
+                  floatingLabelBehavior: FloatingLabelBehavior.never,
+                  labelStyle: TextStyle(color: Colors.transparent),
+                ),
+                onChanged: (_) => onChanged(),
+                onSubmitted: (_) => onSubmitted(),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

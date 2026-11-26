@@ -46,11 +46,11 @@ class FamilyScreen extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 32),
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(Space.page, 0, Space.page, 8),
+                  padding: const EdgeInsets.fromLTRB(Space.page, 4, Space.page, 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('연결된 가족 ${links.length}명', style: t.textTheme.titleLarge),
+                      Text('연결된 가족 ${links.length}명', style: t.textTheme.titleLarge?.copyWith(fontSize: 22)),
                       const SizedBox(height: 2),
                       Text('한 가족에게 여러 보호자가 함께 연결될 수 있습니다.', style: t.textTheme.bodySmall),
                     ],
@@ -62,50 +62,54 @@ class FamilyScreen extends StatelessWidget {
                     title: '연결된 가족이 없습니다',
                     message: '가족의 해봄 앱 → 가족 연결에서 6자리 코드를 받아 입력해 주세요.',
                   ),
-                for (final (i, l) in links.indexed) ...[
-                  if (i > 0) const Divider(indent: Space.page + 56, endIndent: Space.page),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(Space.page, 12, Space.page - 8, 12),
-                    child: Row(
-                      children: [
-                        FamilyAvatar(avatarText(l.elderName, fallback: l.displayName), radius: 22),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(l.displayName, style: t.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w800)),
-                              Text(
-                                '${l.elderName} · ${formatDateTime(l.connectedAt, store.now())} 연결',
-                                style: t.textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
-                        ),
-                        // 연결 해제는 되돌리기 어려워 바로 보이는 버튼 대신 메뉴 안에 둔다 (확인 창 유지)
-                        PopupMenuButton<String>(
-                          tooltip: '${l.displayName} 메뉴',
-                          icon: const Icon(Icons.more_vert_rounded),
-                          onSelected: (v) {
-                            if (v == 'disconnect') _disconnect(context, l);
-                          },
-                          itemBuilder: (context) => [
-                            PopupMenuItem(
-                              value: 'disconnect',
-                              child: Row(
+                if (links.isNotEmpty)
+                  CardGroup(children: [
+                    for (final (i, l) in links.indexed) ...[
+                      if (i > 0) const Divider(indent: Space.page + 58, endIndent: Space.page),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(Space.page, 14, Space.page - 12, 14),
+                        child: Row(
+                          children: [
+                            FamilyAvatar(avatarText(l.elderName, fallback: l.displayName), radius: 24),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(Icons.link_off_rounded, color: Theme.of(context).colorScheme.error),
-                                  const SizedBox(width: 10),
-                                  Text('연결 해제', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                                  Text(l.displayName, style: t.textTheme.titleSmall?.copyWith(fontSize: 17)),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${l.elderName} · ${formatDateTime(l.connectedAt, store.now())} 연결',
+                                    style: t.textTheme.bodySmall,
+                                  ),
                                 ],
                               ),
                             ),
+                            // 연결 해제는 되돌리기 어려워 바로 보이는 버튼 대신 메뉴 안에 둔다 (확인 시트 유지)
+                            PopupMenuButton<String>(
+                              tooltip: '${l.displayName} 메뉴',
+                              icon: const Icon(Icons.more_vert_rounded),
+                              onSelected: (v) {
+                                if (v == 'disconnect') _disconnect(context, l);
+                              },
+                              itemBuilder: (context) => [
+                                PopupMenuItem(
+                                  value: 'disconnect',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.link_off_rounded, color: Theme.of(context).colorScheme.error),
+                                      const SizedBox(width: 10),
+                                      Text('연결 해제', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
-                ],
+                      ),
+                    ],
+                  ]),
                 const SizedBox(height: Space.section),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: Space.page),

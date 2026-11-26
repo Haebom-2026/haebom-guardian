@@ -82,65 +82,83 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
               final who = store.nameOf(n.elderId);
               final confirmedAt = n.readBy[store.guardianId];
               final accent = RiskStyle.color(n.risk, t);
-              return ListView(
-                padding: const EdgeInsets.all(Space.page),
+              final k = HaebomTokens.of(context);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(notificationItemIcon(n), color: accent),
-                              const SizedBox(width: 8),
-                              Text(
-                                notificationLabel(n),
-                                style: t.textTheme.labelLarge?.copyWith(color: accent, fontWeight: FontWeight.w700),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            notificationMessage(n, who),
-                            style: t.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(height: 16),
-                          _row(context, '가족', '$who (${store.linkFor(n.elderId)?.elderName ?? '-'})'),
-                          if (n.appName.isNotEmpty) _row(context, '서비스', n.appName),
-                          if (n.category != null && n.category != SensitivityCategory.none)
-                            _row(context, '분류', n.category!.label),
-                          if (n.reasonText != null) _row(context, '이유', n.reasonText!),
-                          _row(context, '발생 시간', formatDateTime(n.createdAt, store.now())),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (confirmedAt == null)
-                    FilledButton.icon(
-                      key: const Key('notification_confirm'),
-                      onPressed: _confirming ? null : () => _confirm(n.id),
-                      icon: const Icon(Icons.check_rounded),
-                      label: const Text('확인했어요'),
-                    )
-                  else
-                    Row(
-                      key: const Key('notification_confirmed'),
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(Space.page + 4, 8, Space.page + 4, Space.page),
                       children: [
-                        Icon(Icons.check_circle_rounded, color: t.colorScheme.primary),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            '확인함 · ${formatDateTime(confirmedAt, store.now())}',
-                            style: t.textTheme.bodyLarge,
+                        // 위: 큰 아이콘 + 종류 + 문장 + 시간
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: ExcludeSemantics(
+                            child: Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(color: riskTint(n.risk, context), borderRadius: BorderRadius.circular(18)),
+                              child: Icon(notificationItemIcon(n), color: accent, size: 28),
+                            ),
                           ),
                         ),
+                        const SizedBox(height: 18),
+                        Text(
+                          notificationLabel(n),
+                          style: t.textTheme.bodyMedium?.copyWith(color: accent, fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          notificationMessage(n, who),
+                          style: t.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700, height: 1.4),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(formatDateTime(n.createdAt, store.now()), style: t.textTheme.bodyLarge?.copyWith(color: k.textSub)),
+                        const SizedBox(height: 24),
+                        const Divider(),
+                        const SizedBox(height: 8),
+                        // 가운데: 자세한 정보 (왼쪽 항목 · 오른쪽 값)
+                        _row(context, '가족', '$who (${store.linkFor(n.elderId)?.elderName ?? '-'})'),
+                        if (n.appName.isNotEmpty) _row(context, '서비스', n.appName),
+                        if (n.category != null && n.category != SensitivityCategory.none)
+                          _row(context, '분류', n.category!.label),
+                        if (n.reasonText != null) _row(context, '이유', n.reasonText!),
+                        _row(context, '발생 시간', formatDateTime(n.createdAt, store.now())),
+                        const SizedBox(height: 20),
+                        _Guide(type: n.type, scam: n.isScam),
                       ],
                     ),
-                  const SizedBox(height: 16),
-                  _Guide(type: n.type, scam: n.isScam),
+                  ),
+                  // 아래 고정: 확인했어요 / 확인함
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(Space.page, 8, Space.page, Space.page),
+                    child: confirmedAt == null
+                        ? FilledButton.icon(
+                            key: const Key('notification_confirm'),
+                            onPressed: _confirming ? null : () => _confirm(n.id),
+                            icon: const Icon(Icons.check_rounded),
+                            label: const Text('확인했어요'),
+                          )
+                        : Container(
+                            key: const Key('notification_confirmed'),
+                            constraints: const BoxConstraints(minHeight: Space.button),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            decoration: BoxDecoration(color: k.positiveBg, borderRadius: BorderRadius.circular(Space.radius)),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.check_circle_rounded, color: k.primary),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    '확인함 · ${formatDateTime(confirmedAt, store.now())}',
+                                    style: t.textTheme.bodyLarge?.copyWith(color: k.primary, fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                  ),
                 ],
               );
             },
@@ -153,15 +171,17 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
   Widget _row(BuildContext context, String label, String value) {
     final t = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 80,
-            child: Text(label, style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant)),
+            width: 84,
+            child: Text(label, style: t.textTheme.bodyLarge?.copyWith(color: t.colorScheme.onSurfaceVariant)),
           ),
-          Expanded(child: Text(value, style: t.textTheme.bodyLarge)),
+          Expanded(
+            child: Text(value, textAlign: TextAlign.end, style: t.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
+          ),
         ],
       ),
     );
@@ -194,11 +214,11 @@ class _Guide extends StatelessWidget {
     };
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: t.colorScheme.surfaceContainerLow, borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(color: t.colorScheme.surfaceContainerLow, borderRadius: BorderRadius.circular(Space.radius)),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline_rounded, color: t.colorScheme.onSurfaceVariant),
+          Icon(Icons.info_outline_rounded, color: t.colorScheme.primary),
           const SizedBox(width: 10),
           Expanded(child: Text(text, style: t.textTheme.bodyMedium)),
         ],

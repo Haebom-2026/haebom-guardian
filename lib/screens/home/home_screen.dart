@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/dependencies.dart';
@@ -85,16 +87,28 @@ class HomeScreen extends StatelessWidget {
                 _News.approval(a),
             ]..sort((a, b) => b.at.compareTo(a.at));
             final helpCount = sos.length + stuck.length + pending.length;
+            final todayCount = store.notificationsFor(elderId: elder).where((n) => isSameDay(n.createdAt, now)).length;
 
             return ListView(
               padding: const EdgeInsets.only(bottom: 32),
               children: [
+                // 첫 문구: 지금 확인할 일이 몇 건인지 (햇살 그림은 장식)
+                _HomeHero(count: helpCount + unreadNormal.length, now: now),
+
                 // ① 누구의 정보인지
                 _FamilyHeader(store: store),
                 if (store.links.length >= 2) ...[
                   const SizedBox(height: 12),
                   FamilyFilterBar(store: store),
                 ],
+                const SizedBox(height: Space.gap),
+                _SummaryTiles(
+                  today: todayCount,
+                  unread: unread.length,
+                  pending: pending.length,
+                  onNotifications: () => deps.tabIndex.value = 1,
+                  onApprovals: () => deps.tabIndex.value = 2,
+                ),
 
                 // ② 도움이 필요한 일: SOS → 도움 필요 → 승인 대기
                 SectionHeader('도움이 필요한 일', count: helpCount == 0 ? null : helpCount, countKey: const ValueKey('help_count')),
@@ -102,7 +116,7 @@ class HomeScreen extends StatelessWidget {
                   const _NothingToCheck()
                 else
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: Space.page),
+                    padding: const EdgeInsets.symmetric(horizontal: Space.page - 4),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -131,10 +145,12 @@ class HomeScreen extends StatelessWidget {
                 if (unreadNormal.isEmpty)
                   const _Quiet('확인하지 않은 알림이 없어요.')
                 else
-                  for (final (i, n) in unreadNormal.take(_unreadLimit).indexed) ...[
-                    if (i > 0) const RowDivider(),
-                    NotificationTile(item: n, store: store, onTap: () => openNotification(n.id)),
-                  ],
+                  CardGroup(children: [
+                    for (final (i, n) in unreadNormal.take(_unreadLimit).indexed) ...[
+                      if (i > 0) const RowDivider(),
+                      NotificationTile(item: n, store: store, onTap: () => openNotification(n.id)),
+                    ],
+                  ]),
                 if (unreadNormal.length > _unreadLimit)
                   _MoreLink('확인하지 않은 알림 ${unreadNormal.length - _unreadLimit}건 더 보기', () => deps.tabIndex.value = 1),
 
@@ -143,14 +159,16 @@ class HomeScreen extends StatelessWidget {
                 if (recent.isEmpty)
                   const _Quiet('최근 소식이 없어요.')
                 else
-                  for (final (i, item) in recent.take(_recentLimit).indexed) ...[
-                    if (i > 0) const RowDivider(),
-                    item.notification != null
-                        ? NotificationTile(
-                            item: item.notification!, store: store, onTap: () => openNotification(item.notification!.id))
-                        : ApprovalCard(request: item.approval!, store: store, onTap: () => openApproval(item.approval!.id)),
-                  ],
-                const SizedBox(height: 8),
+                  CardGroup(children: [
+                    for (final (i, item) in recent.take(_recentLimit).indexed) ...[
+                      if (i > 0) const RowDivider(),
+                      item.notification != null
+                          ? NotificationTile(
+                              item: item.notification!, store: store, onTap: () => openNotification(item.notification!.id))
+                          : ApprovalCard(request: item.approval!, store: store, onTap: () => openApproval(item.approval!.id)),
+                    ],
+                  ]),
+                const SizedBox(height: Space.section),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: Space.page),
                   child: Row(
@@ -232,6 +250,215 @@ class _News {
   final DateTime at;
 }
 
+/// 홈 첫 문구: "확인할 일이 N건 있어요" + 날짜. 오른쪽 위 햇살은 장식(낭독 안 함).
+/// 확인할 일이 없을 때도 '안전하다'고 말하지 않는다.
+class _HomeHero extends StatelessWidget {
+  const _HomeHero({required this.count, required this.now});
+  final int count;
+  final DateTime now;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final k = HaebomTokens.of(context);
+    const w = ['월', '화', '수', '목', '금', '토', '일'];
+    final headline = t.textTheme.headlineSmall?.copyWith(fontSize: 27, fontWeight: FontWeight.w700, height: 1.35);
+    return ClipRect(
+      child: Stack(
+        children: [
+          const Positioned(top: -50, right: -56, child: _Sun(size: 210)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(Space.page, 8, 120, Space.section),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${now.month}월 ${now.day}일 ${w[now.weekday - 1]}요일',
+                  style: t.textTheme.bodyMedium?.copyWith(color: k.textSub, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 6),
+                Semantics(
+                  header: true,
+                  child: count == 0
+                      ? Text('지금은 확인할\n일이 없어요', style: headline)
+                      : Text.rich(
+                          TextSpan(children: [
+                            const TextSpan(text: '확인할 일이\n'),
+                            TextSpan(text: '$count건', style: TextStyle(color: k.primary)),
+                            const TextSpan(text: ' 있어요'),
+                          ]),
+                          style: headline,
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 장식용 햇살 (동심원 + 빛줄기). 다크 모드에서는 은은하게.
+class _Sun extends StatelessWidget {
+  const _Sun({required this.size});
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+        child: Opacity(
+          opacity: Theme.of(context).brightness == Brightness.dark ? 0.35 : 1,
+          child: CustomPaint(size: Size.square(size), painter: _SunPainter()),
+        ),
+      );
+}
+
+class _SunPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = size.center(Offset.zero);
+    final r = size.width / 2;
+    canvas.drawCircle(c, r * 0.95, Paint()..color = const Color(0xFFFFF3CC));
+    canvas.drawCircle(c, r * 0.67, Paint()..color = const Color(0xFFFFE7A0));
+    canvas.drawCircle(c, r * 0.40, Paint()..color = const Color(0xFFFFCB3D));
+    final ray = Paint()
+      ..color = const Color(0xFFFFCB3D)
+      ..strokeWidth = r * 0.064
+      ..strokeCap = StrokeCap.round;
+    for (var i = 0; i < 8; i++) {
+      final a = i * math.pi / 4;
+      final d = Offset(math.cos(a), math.sin(a));
+      canvas.drawLine(c + d * (r * 0.50), c + d * (r * 0.58), ray);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// 숫자 카드 3개: 오늘 알림 / 확인 전 / 승인 대기 (아이콘 + 글자 + 숫자)
+class _SummaryTiles extends StatelessWidget {
+  const _SummaryTiles({
+    required this.today,
+    required this.unread,
+    required this.pending,
+    required this.onNotifications,
+    required this.onApprovals,
+  });
+  final int today;
+  final int unread;
+  final int pending;
+  final VoidCallback onNotifications;
+  final VoidCallback onApprovals;
+
+  @override
+  Widget build(BuildContext context) {
+    final k = HaebomTokens.of(context);
+    final light = Theme.of(context).brightness == Brightness.light;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: Space.page - 4),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: _Tile(
+                icon: Icons.notifications_none_rounded,
+                iconColor: light ? const Color(0xFF8A5A00) : k.brand,
+                tint: Theme.of(context).colorScheme.secondaryContainer,
+                label: '오늘 알림',
+                value: today,
+                onTap: onNotifications,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _Tile(
+                icon: Icons.mark_email_unread_outlined,
+                iconColor: k.dangerText,
+                tint: k.dangerBg,
+                label: '확인 전',
+                value: unread,
+                valueColor: unread > 0 ? k.dangerText : null,
+                onTap: onNotifications,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _Tile(
+                icon: Icons.verified_user_outlined,
+                iconColor: k.cautionText,
+                tint: k.cautionBg,
+                label: '승인 대기',
+                value: pending,
+                valueColor: pending > 0 ? k.cautionText : null,
+                onTap: onApprovals,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Tile extends StatelessWidget {
+  const _Tile({
+    required this.icon,
+    required this.iconColor,
+    required this.tint,
+    required this.label,
+    required this.value,
+    this.valueColor,
+    required this.onTap,
+  });
+  final IconData icon;
+  final Color iconColor;
+  final Color tint;
+  final String label;
+  final int value;
+  final Color? valueColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    return Container(
+      decoration: cardDecoration(context),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: onTap,
+          child: Semantics(
+            button: true,
+            label: '$label $value',
+            excludeSemantics: true,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 16, 10, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(color: tint, borderRadius: BorderRadius.circular(11)),
+                    child: Icon(icon, size: 18, color: iconColor),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(label, style: t.textTheme.bodySmall?.copyWith(fontSize: 13)),
+                  const SizedBox(height: 2),
+                  Text('$value', style: t.textTheme.titleLarge?.copyWith(fontSize: 22, color: valueColor)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// 누구의 정보를 보고 있는지: 한 명이면 "어머니 (김순자)", 여러 명이면 호칭 목록 + 가족 선택 칩
 class _FamilyHeader extends StatelessWidget {
   const _FamilyHeader({required this.store});
@@ -249,17 +476,19 @@ class _FamilyHeader extends StatelessWidget {
       '연결된 가족 ${links.length}명',
       if (latest != null) '최근 알림 ${formatAgo(latest.createdAt, store.now())}',
     ].join(' · ');
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(Space.page, 4, Space.page, 0),
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: Space.page - 4),
+      padding: const EdgeInsets.all(Space.card + 2),
+      decoration: cardDecoration(context),
       child: Row(
         children: [
           if (one != null)
-            FamilyAvatar(avatarText(one.elderName, fallback: one.displayName), radius: 24)
+            FamilyAvatar(avatarText(one.elderName, fallback: one.displayName), radius: 26)
           else
             // 여러 명: 겹친 이름 대신 가족 아이콘 하나 (이름은 오른쪽 제목에)
             ExcludeSemantics(
               child: CircleAvatar(
-                radius: 24,
+                radius: 26,
                 backgroundColor: t.colorScheme.secondaryContainer,
                 foregroundColor: t.colorScheme.onSecondaryContainer,
                 child: const Icon(Icons.people_alt_rounded, size: 26),
@@ -291,13 +520,13 @@ class _NothingToCheck extends StatelessWidget {
     final t = Theme.of(context);
     final k = HaebomTokens.of(context);
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: Space.page),
-      padding: const EdgeInsets.all(Space.card),
-      decoration: BoxDecoration(color: k.subtle, borderRadius: BorderRadius.circular(Space.radius)),
+      margin: const EdgeInsets.symmetric(horizontal: Space.page - 4),
+      padding: const EdgeInsets.all(Space.card + 2),
+      decoration: cardDecoration(context),
       child: Row(
         children: [
-          Icon(Icons.verified_user_outlined, color: k.primary, size: 28),
-          const SizedBox(width: 12),
+          IconBadge(Icons.verified_user_outlined, color: k.primary, background: k.positiveBg),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

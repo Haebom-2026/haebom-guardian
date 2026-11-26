@@ -28,87 +28,97 @@ class SettingsScreen extends StatelessWidget {
           builder: (context, _) => ListView(
             padding: const EdgeInsets.only(bottom: 32),
             children: [
-              const SectionHeader('알림 받기', padding: EdgeInsets.fromLTRB(Space.page, 8, Space.page, 4)),
-              SwitchListTile(
-                title: const Text('앱 이용 알림'),
-                subtitle: const Text('민감 서비스 이용 · 도움 필요'),
-                value: settings.activityAlerts,
-                onChanged: (v) => settings.activityAlerts = v,
-              ),
-              divider,
-              SwitchListTile(
-                title: const Text('승인 요청 알림'),
-                subtitle: const Text('도우미 진행 승인 요청'),
-                value: settings.approvalAlerts,
-                onChanged: (v) => settings.approvalAlerts = v,
-              ),
-              divider,
-              SwitchListTile(
-                title: const Text('SOS 알림'),
-                subtitle: const Text('SOS · 사기 의심 (끄지 않는 것을 권장)'),
-                value: settings.sosAlerts,
-                onChanged: (v) => settings.sosAlerts = v,
-              ),
-              const SectionHeader('잠금 화면'),
-              SwitchListTile(
-                title: const Text('알림에 상세 내용 표시'),
-                subtitle: const Text('끄면 "새 가족 알림이 도착했습니다"만 표시'),
-                value: settings.showDetailsInNotification,
-                onChanged: (v) => settings.showDetailsInNotification = v,
-              ),
-              divider,
-              ListTile(
-                title: const Text('기기 알림 권한 확인'),
-                subtitle: const Text('알림이 오지 않을 때 눌러 주세요'),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () async {
-                  final granted = await deps.notifications.requestPermission();
-                  if (context.mounted) {
-                    showMessage(context, granted ? '알림 권한이 허용되어 있습니다.' : '알림 권한이 꺼져 있습니다. 휴대폰 설정에서 허용해 주세요.');
-                  }
-                },
-              ),
-              const SectionHeader('연결 상태'),
-              ListTile(
-                title: const Text('데이터 연결'),
-                trailing: Text(deps.mockBackend != null ? '테스트 데이터' : '서버'),
-              ),
-              if (deps.push != null) ...[
+              const _GroupLabel('알림 받기', first: true),
+              CardGroup(children: [
+                SwitchListTile(
+                  title: const Text('SOS 알림'),
+                  subtitle: const Text('SOS · 사기 의심 (끄지 않는 것을 권장)'),
+                  value: settings.sosAlerts,
+                  onChanged: (v) => settings.sosAlerts = v,
+                ),
                 divider,
-                _PushStatusTile(push: deps.push!),
-              ],
-              const SectionHeader('정보'),
-              ListTile(
-                title: const Text('개인정보 보호 안내'),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => _showPrivacy(context),
-              ),
-              divider,
-              const ListTile(
-                leading: BrandMark(size: 32),
-                title: Text('해봄 가족'),
-                subtitle: Text('오늘도, 스스로 해봄.'),
-                trailing: Text(appVersion),
-              ),
-              divider,
-              ListTile(
-                title: const Text('오픈소스 라이선스'),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => showLicensePage(
-                  context: context,
-                  applicationName: '해봄 가족',
-                  applicationVersion: appVersion,
+                SwitchListTile(
+                  title: const Text('승인 요청 알림'),
+                  subtitle: const Text('도우미 진행 승인 요청'),
+                  value: settings.approvalAlerts,
+                  onChanged: (v) => settings.approvalAlerts = v,
                 ),
-              ),
-              if (AppRoutes.developerEnabled && deps.mockBackend != null) ...[
-                const SectionHeader('개발자'),
+                divider,
+                SwitchListTile(
+                  title: const Text('앱 이용 알림'),
+                  subtitle: const Text('민감 서비스 이용 · 도움 필요'),
+                  value: settings.activityAlerts,
+                  onChanged: (v) => settings.activityAlerts = v,
+                ),
+              ]),
+              const _GroupLabel('잠금 화면'),
+              CardGroup(children: [
+                SwitchListTile(
+                  title: const Text('알림에 상세 내용 표시'),
+                  subtitle: const Text('끄면 "새 가족 알림이 도착했습니다"만 표시'),
+                  value: settings.showDetailsInNotification,
+                  onChanged: (v) => settings.showDetailsInNotification = v,
+                ),
+                divider,
                 ListTile(
-                  key: const Key('developer_entry'),
-                  title: const Text('개발자 테스트 모드'),
-                  subtitle: const Text('디버그 빌드에서만 표시'),
+                  title: const Text('기기 알림 권한 확인'),
+                  subtitle: const Text('알림이 오지 않을 때 눌러 주세요'),
                   trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => Navigator.pushNamed(context, AppRoutes.developer),
+                  onTap: () async {
+                    final granted = await deps.notifications.requestPermission();
+                    if (context.mounted) {
+                      showMessage(context, granted ? '알림 권한이 허용되어 있습니다.' : '알림 권한이 꺼져 있습니다. 휴대폰 설정에서 허용해 주세요.');
+                    }
+                  },
                 ),
+              ]),
+              const _GroupLabel('연결 상태'),
+              CardGroup(children: [
+                ListTile(
+                  title: const Text('데이터 연결'),
+                  trailing: Text(deps.mockBackend != null ? '테스트 데이터' : '서버'),
+                ),
+                if (deps.push != null) ...[
+                  divider,
+                  _PushStatusTile(push: deps.push!),
+                ],
+              ]),
+              const _GroupLabel('정보'),
+              CardGroup(children: [
+                ListTile(
+                  title: const Text('개인정보 보호 안내'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => _showPrivacy(context),
+                ),
+                divider,
+                const ListTile(
+                  leading: BrandMark(size: 32),
+                  title: Text('해봄 가족'),
+                  subtitle: Text('오늘도, 스스로 해봄.'),
+                  trailing: Text(appVersion),
+                ),
+                divider,
+                ListTile(
+                  title: const Text('오픈소스 라이선스'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => showLicensePage(
+                    context: context,
+                    applicationName: '해봄 가족',
+                    applicationVersion: appVersion,
+                  ),
+                ),
+              ]),
+              if (AppRoutes.developerEnabled && deps.mockBackend != null) ...[
+                const _GroupLabel('개발자'),
+                CardGroup(children: [
+                  ListTile(
+                    key: const Key('developer_entry'),
+                    title: const Text('개발자 테스트 모드'),
+                    subtitle: const Text('디버그 빌드에서만 표시'),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => Navigator.pushNamed(context, AppRoutes.developer),
+                  ),
+                ]),
               ],
             ],
           ),
@@ -204,5 +214,27 @@ class _PushStatusTile extends StatelessWidget {
                 : Text(label),
           );
         },
+      );
+}
+
+/// 설정 묶음 제목 (작은 회색 글자)
+class _GroupLabel extends StatelessWidget {
+  const _GroupLabel(this.text, {this.first = false});
+  final String text;
+  final bool first;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: EdgeInsets.fromLTRB(Space.page + 4, first ? 8 : Space.section, Space.page, 8),
+        child: Semantics(
+          header: true,
+          child: Text(
+            text,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: HaebomTokens.of(context).textSub,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ),
       );
 }

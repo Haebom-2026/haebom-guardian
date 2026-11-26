@@ -3,9 +3,10 @@ import 'package:material_ui/material_ui.dart';
 import '../models/approval_request.dart';
 import '../models/sensitivity.dart';
 
-/// 해봄 가족 디자인 규칙 (11-26 UI 개편)
+/// 해봄 가족 디자인 규칙 (11-26 햇살 톤 개편 — Claude Design 시안 기준)
 ///
-/// - 노랑(#FFD34E)은 브랜드 포인트(로고·햇살·하단 탭 선택 표시)에만 쓴다. 흰 배경 위 글자색으로는 쓰지 않는다(명암비 1.4).
+/// - 바탕은 따뜻한 아이보리, 카드는 흰색 + 옅은 따뜻한 그림자.
+/// - 노랑(#FFCB3D)은 브랜드 포인트(로고·햇살·하단 탭 선택 표시)에만 쓴다. 흰 배경 위 글자색으로는 쓰지 않는다.
 /// - 짙은 녹색(#245D45)은 주요 버튼과 긍정 상태에 쓴다.
 /// - 주의(주황)·긴급(빨강)은 배경 + 글자 + 아이콘을 함께 써서 색만으로 구분하지 않는다.
 /// - 글자색 조합은 모두 명암비 4.5:1 이상 (라이트·다크 모두 계산해 확인).
@@ -22,8 +23,11 @@ class Space {
   /// 카드 안쪽 여백
   static const card = 16.0;
 
+  /// 버튼·입력칸·안내 상자 모서리
+  static const radius = 16.0;
+
   /// 카드 모서리
-  static const radius = 14.0;
+  static const cardRadius = 22.0;
 
   /// 주요 버튼 높이
   static const button = 56.0;
@@ -38,6 +42,7 @@ class HaebomTokens extends ThemeExtension<HaebomTokens> {
     required this.onPrimary,
     required this.background,
     required this.subtle,
+    required this.card,
     required this.text,
     required this.textSub,
     required this.divider,
@@ -58,6 +63,9 @@ class HaebomTokens extends ThemeExtension<HaebomTokens> {
 
   /// 보조 배경 (안내 상자·입력칸)
   final Color subtle;
+
+  /// 카드 배경 (바탕 위에 떠 있는 흰 카드)
+  final Color card;
   final Color text;
   final Color textSub;
   final Color divider;
@@ -80,38 +88,40 @@ class HaebomTokens extends ThemeExtension<HaebomTokens> {
   final Color cancelledText;
 
   static const light = HaebomTokens(
-    brand: Color(0xFFFFD34E),
+    brand: Color(0xFFFFCB3D),
     primary: Color(0xFF245D45),
     onPrimary: Colors.white,
-    background: Colors.white,
-    subtle: Color(0xFFF5F6F4),
-    text: Color(0xFF202820),
-    textSub: Color(0xFF536159),
-    divider: Color(0xFFE3E6E2),
-    cautionBg: Color(0xFFFFF1E5),
+    background: Color(0xFFFBF7EE),
+    subtle: Color(0xFFF4EEE2),
+    card: Colors.white,
+    text: Color(0xFF26221B),
+    textSub: Color(0xFF6E675C),
+    divider: Color(0xFFEFE8DA),
+    cautionBg: Color(0xFFFFF2E8),
     cautionText: Color(0xFFA34114),
-    dangerBg: Color(0xFFFDECEA),
+    dangerBg: Color(0xFFFDEEEC),
     dangerText: Color(0xFFB3362A),
-    positiveBg: Color(0xFFE3EFE8),
-    neutralText: Color(0xFF536159),
+    positiveBg: Color(0xFFEAF3EE),
+    neutralText: Color(0xFF6E675C),
     cancelledText: Color(0xFF52627A),
   );
 
   static const dark = HaebomTokens(
-    brand: Color(0xFFFFD34E),
+    brand: Color(0xFFFFCB3D),
     primary: Color(0xFF8CC7A1),
     onPrimary: Color(0xFF0F2A1E),
-    background: Color(0xFF121613),
-    subtle: Color(0xFF1C221E),
-    text: Color(0xFFE8ECE8),
-    textSub: Color(0xFFA9B5AE),
-    divider: Color(0xFF2C342F),
+    background: Color(0xFF15130F),
+    subtle: Color(0xFF26221B),
+    card: Color(0xFF201D17),
+    text: Color(0xFFEEE9DF),
+    textSub: Color(0xFFB5AC9D),
+    divider: Color(0xFF332E25),
     cautionBg: Color(0xFF3A2618),
     cautionText: Color(0xFFF4B28A),
     dangerBg: Color(0xFF3A1F1C),
     dangerText: Color(0xFFF08A7E),
     positiveBg: Color(0xFF203A2C),
-    neutralText: Color(0xFFA9B5AE),
+    neutralText: Color(0xFFB5AC9D),
     cancelledText: Color(0xFF9DB0C7),
   );
 
@@ -138,7 +148,7 @@ class RiskStyle {
   static Color background(RiskTone tone, ThemeData t) {
     final k = t.extension<HaebomTokens>() ?? HaebomTokens.light;
     return switch (tone) {
-      RiskTone.normal => k.subtle,
+      RiskTone.normal => k.card,
       RiskTone.caution => k.cautionBg,
       RiskTone.danger => k.dangerBg,
     };
@@ -169,7 +179,7 @@ ThemeData _build(HaebomTokens k, Brightness brightness) {
     onPrimary: k.onPrimary,
     primaryContainer: k.positiveBg,
     onPrimaryContainer: k.text,
-    secondaryContainer: brightness == Brightness.light ? const Color(0xFFFFF3CB) : const Color(0xFF3B3320),
+    secondaryContainer: brightness == Brightness.light ? const Color(0xFFFFF3CC) : const Color(0xFF3B3320),
     onSecondaryContainer: k.text,
     surface: k.background,
     onSurface: k.text,
@@ -212,11 +222,12 @@ ThemeData _build(HaebomTokens k, Brightness brightness) {
       titleTextStyle: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: k.text),
     ),
     cardTheme: CardThemeData(
-      color: k.subtle,
+      color: k.card,
       surfaceTintColor: Colors.transparent,
-      elevation: 0,
+      shadowColor: brightness == Brightness.light ? const Color(0x406E5014) : Colors.transparent,
+      elevation: brightness == Brightness.light ? 1.5 : 0,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: radius),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Space.cardRadius)),
     ),
     listTileTheme: ListTileThemeData(
       contentPadding: const EdgeInsets.symmetric(horizontal: Space.page),
@@ -259,8 +270,8 @@ ThemeData _build(HaebomTokens k, Brightness brightness) {
       focusedBorder: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: k.primary, width: 2)),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: k.background,
-      indicatorColor: brightness == Brightness.light ? const Color(0xFFFFE9A3) : const Color(0xFF4A3F1E),
+      backgroundColor: k.card,
+      indicatorColor: brightness == Brightness.light ? const Color(0xFFFFE7A0) : const Color(0xFF4A3F1E),
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       height: 68,
@@ -286,14 +297,22 @@ ThemeData _build(HaebomTokens k, Brightness brightness) {
       secondaryLabelStyle: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: k.primary),
     ),
     dividerTheme: DividerThemeData(color: k.divider, space: 1, thickness: 1),
+    // 켜짐: 녹색 바탕 + 흰 손잡이 / 꺼짐: 연한 회갈색 바탕 + 흰 손잡이 (위치로도 구분)
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? k.onPrimary : k.card),
+      trackColor: WidgetStateProperty.resolveWith(
+        (s) => s.contains(WidgetState.selected) ? k.primary : (brightness == Brightness.light ? const Color(0xFFD9D0BF) : k.divider),
+      ),
+      trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+    ),
     dialogTheme: DialogThemeData(
-      backgroundColor: k.background,
+      backgroundColor: k.card,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     ),
-    bottomSheetTheme: BottomSheetThemeData(backgroundColor: k.background, surfaceTintColor: Colors.transparent),
+    bottomSheetTheme: BottomSheetThemeData(backgroundColor: k.card, surfaceTintColor: Colors.transparent),
     popupMenuTheme: PopupMenuThemeData(
-      color: k.background,
+      color: k.card,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: radius, side: BorderSide(color: k.divider)),
     ),
@@ -311,3 +330,29 @@ ThemeData _build(HaebomTokens k, Brightness brightness) {
 ThemeData buildLightTheme() => _build(HaebomTokens.light, Brightness.light);
 
 ThemeData buildDarkTheme() => _build(HaebomTokens.dark, Brightness.dark);
+
+/// 바탕 위에 떠 있는 흰 카드 (라이트: 옅은 따뜻한 그림자 / 다크: 그림자 없음)
+BoxDecoration cardDecoration(BuildContext context, {Color? color}) {
+  final k = HaebomTokens.of(context);
+  final light = Theme.of(context).brightness == Brightness.light;
+  return BoxDecoration(
+    color: color ?? k.card,
+    borderRadius: BorderRadius.circular(Space.cardRadius),
+    boxShadow: light
+        ? const [
+            BoxShadow(color: Color(0x0A6E5014), blurRadius: 2, offset: Offset(0, 1)),
+            BoxShadow(color: Color(0x0F6E5014), blurRadius: 24, offset: Offset(0, 8)),
+          ]
+        : null,
+  );
+}
+
+/// 위험도별 아이콘 칸 배경 (연한 색)
+Color riskTint(RiskTone tone, BuildContext context) {
+  final k = HaebomTokens.of(context);
+  return switch (tone) {
+    RiskTone.normal => k.positiveBg,
+    RiskTone.caution => k.cautionBg,
+    RiskTone.danger => k.dangerBg,
+  };
+}

@@ -207,7 +207,7 @@ class FamilyFilterBar extends StatelessWidget {
   );
 }
 
-/// 필터 칩. 선택되면 연한 녹색 바탕 + 녹색 굵은 글자 (색 + 굵기로 구분)
+/// 필터 칩. 선택되면 진한 바탕 + 밝은 굵은 글자, 아니면 흰 바탕 (색 + 굵기로 구분)
 class FilterPill extends StatelessWidget {
   const FilterPill({super.key, required this.label, required this.selected, required this.onSelected});
   final String label;
@@ -221,10 +221,13 @@ class FilterPill extends StatelessWidget {
       label: Text(label),
       selected: selected,
       showCheckmark: false,
+      backgroundColor: k.card,
+      selectedColor: k.text,
+      side: selected ? BorderSide.none : BorderSide(color: k.divider),
       labelStyle: TextStyle(
         fontSize: 15,
         fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-        color: selected ? k.primary : k.text,
+        color: selected ? k.card : k.text,
       ),
       onSelected: (_) => onSelected(),
     );
@@ -247,12 +250,50 @@ String riskLabel(RiskTone tone) => switch (tone) {
   RiskTone.danger => '긴급',
 };
 
-/// 목록 줄 사이 구분선 (아이콘 열 다음부터)
+/// 목록 줄 사이 구분선 (아이콘 칸 다음부터)
 class RowDivider extends StatelessWidget {
   const RowDivider({super.key});
 
   @override
-  Widget build(BuildContext context) => const Divider(indent: Space.page + 36, endIndent: Space.page);
+  Widget build(BuildContext context) => const Divider(indent: Space.page + IconBadge.size + 14, endIndent: Space.page);
+}
+
+/// 연한 색 둥근 칸 안의 아이콘 (목록·카드 공통)
+class IconBadge extends StatelessWidget {
+  const IconBadge(this.icon, {super.key, required this.color, required this.background});
+  static const size = 40.0;
+  final IconData icon;
+  final Color color;
+  final Color background;
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(13)),
+          child: Icon(icon, color: color, size: 22),
+        ),
+      );
+}
+
+/// 흰 카드 한 장에 목록 여러 줄을 묶는다 (홈·알림·설정 공통)
+class CardGroup extends StatelessWidget {
+  const CardGroup({super.key, required this.children, this.margin = const EdgeInsets.symmetric(horizontal: Space.page - 4)});
+  final List<Widget> children;
+  final EdgeInsetsGeometry margin;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: margin,
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        decoration: cardDecoration(context),
+        clipBehavior: Clip.antiAlias,
+        child: Material(
+          type: MaterialType.transparency,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+        ),
+      );
 }
 
 /// 모든 목록이 쓰는 한 줄 구성: [아이콘 24] [제목 / 보조 정보] [오른쪽 상태]
@@ -284,9 +325,9 @@ class ListRow extends StatelessWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.only(top: 1),
-                child: SizedBox(width: 24, child: leading),
+                child: ConstrainedBox(constraints: const BoxConstraints(minWidth: 24), child: leading),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -321,7 +362,7 @@ class NotificationTile extends StatelessWidget {
     final reason = item.reasonText;
     return ListRow(
       onTap: onTap,
-      leading: Icon(notificationItemIcon(item), color: accent, size: 24),
+      leading: IconBadge(notificationItemIcon(item), color: accent, background: riskTint(item.risk, context)),
       title: Text(
         notificationMessage(item, store.nameOf(item.elderId)),
         style: t.textTheme.bodyLarge?.copyWith(fontWeight: unread ? FontWeight.w800 : FontWeight.w500),
@@ -401,7 +442,7 @@ class ApprovalCard extends StatelessWidget {
         final style = StatusStyle.of(status, t.brightness);
         return ListRow(
           onTap: onTap,
-          leading: Icon(style.icon, color: style.color, size: 24),
+          leading: IconBadge(style.icon, color: style.color, background: style.color.withValues(alpha: 0.12)),
           title: Text('$who · ${request.appName}', style: t.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700)),
           lines: [
             Text(ApprovalActions.label(request.action), style: t.textTheme.bodyMedium),
@@ -448,42 +489,47 @@ class HelpCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     final color = RiskStyle.color(tone, t);
-    return Material(
-      color: RiskStyle.background(tone, t),
-      borderRadius: BorderRadius.circular(Space.radius),
+    return Container(
+      decoration: cardDecoration(context),
       clipBehavior: Clip.antiAlias,
-      // 상자 어디를 눌러도 버튼과 같은 상세 화면으로 이동
-      child: InkWell(
-        onTap: onPressed,
-        child: Padding(
-          padding: const EdgeInsets.all(Space.card),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(icon, color: color, size: 24),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+      child: Material(
+        type: MaterialType.transparency,
+        // 상자 어디를 눌러도 버튼과 같은 상세 화면으로 이동
+        child: InkWell(
+          onTap: onPressed,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(Space.page, 18, Space.page, Space.page),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 종류 표시: 연한 색 바탕 + 아이콘 + 글자 (색만으로 구분하지 않음)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(color: riskTint(tone, context), borderRadius: BorderRadius.circular(9)),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          tag,
-                          style: t.textTheme.bodySmall?.copyWith(color: color, fontWeight: FontWeight.w800),
+                        Icon(icon, color: color, size: 16),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            tag,
+                            style: t.textTheme.bodySmall?.copyWith(color: color, fontWeight: FontWeight.w800, fontSize: 13),
+                          ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(title, style: t.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w800)),
-                        for (final l in lines) ...[const SizedBox(height: 2), l],
                       ],
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              FilledButton(key: buttonKey, onPressed: onPressed, child: Text(buttonLabel)),
-            ],
+                ),
+                const SizedBox(height: 12),
+                Text(title, style: t.textTheme.titleMedium?.copyWith(fontSize: 18, height: 1.45)),
+                for (final l in lines) ...[const SizedBox(height: 4), l],
+                const SizedBox(height: 16),
+                FilledButton(key: buttonKey, onPressed: onPressed, child: Text(buttonLabel)),
+              ],
+            ),
           ),
         ),
       ),
@@ -498,7 +544,7 @@ void showMessage(BuildContext context, String message) {
     ..showSnackBar(SnackBar(content: Text(message)));
 }
 
-/// 확인 팝업. 확인 시 true.
+/// 확인 시트 (아래에서 올라옴). 확인 시 true. 바깥을 누르거나 뒤로 가면 취소.
 Future<bool> confirmDialog(
   BuildContext context, {
   required String title,
@@ -506,32 +552,56 @@ Future<bool> confirmDialog(
   required String confirmLabel,
   bool destructive = false,
 }) async {
-  final result = await showDialog<bool>(
+  final result = await showModalBottomSheet<bool>(
     context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    useSafeArea: true,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
     builder: (ctx) {
-      final scheme = Theme.of(ctx).colorScheme;
-      return AlertDialog(
-        title: Text(title, style: Theme.of(ctx).textTheme.titleLarge),
-        content: Text(message, style: Theme.of(ctx).textTheme.bodyLarge),
-        actions: [
-          TextButton(
-            key: const Key('confirm_dialog_cancel'),
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('취소'),
+      final t = Theme.of(ctx);
+      final k = HaebomTokens.of(ctx);
+      final scheme = t.colorScheme;
+      return SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(Space.page + 4, 0, Space.page, Space.page),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Semantics(header: true, child: Text(title, style: t.textTheme.titleLarge?.copyWith(fontSize: 21))),
+              const SizedBox(height: 10),
+              Text(message, style: t.textTheme.bodyLarge?.copyWith(color: k.textSub)),
+              const SizedBox(height: Space.section),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton(
+                      key: const Key('confirm_dialog_cancel'),
+                      style: FilledButton.styleFrom(backgroundColor: k.subtle, foregroundColor: k.text),
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('취소'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton(
+                      key: const Key('confirm_dialog_ok'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: destructive ? scheme.error : null,
+                        foregroundColor: destructive
+                            ? (scheme.brightness == Brightness.dark ? const Color(0xFF2A0F0C) : Colors.white)
+                            : null,
+                      ),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: Text(confirmLabel, textAlign: TextAlign.center),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          FilledButton(
-            key: const Key('confirm_dialog_ok'),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size(64, 48),
-              backgroundColor: destructive ? scheme.error : null,
-              foregroundColor: destructive
-                  ? (scheme.brightness == Brightness.dark ? const Color(0xFF2A0F0C) : Colors.white)
-                  : null,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(confirmLabel),
-          ),
-        ],
+        ),
       );
     },
   );

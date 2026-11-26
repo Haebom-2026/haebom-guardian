@@ -29,6 +29,12 @@ Future<TestEnv> pumpApp(WidgetTester tester, {bool phoneSize = true}) async {
   return env;
 }
 
+/// 화면 아래로 밀려난 ListView 항목까지 스크롤 (홈 첫 문구·숫자 카드 아래에 있는 섹션 확인용)
+Future<void> reveal(WidgetTester tester, Finder f, {bool up = false}) async {
+  await tester.scrollUntilVisible(f, up ? -150 : 150, scrollable: find.byType(Scrollable).first);
+  await tester.pumpAndSettle();
+}
+
 /// 지연 생성되는 ListView 항목까지 스크롤한 뒤 탭
 Future<void> tapVisible(WidgetTester tester, Finder f) async {
   await tester.scrollUntilVisible(f, 150, scrollable: find.byType(Scrollable).first);
@@ -49,13 +55,16 @@ void main() {
     expect(find.text('해봄 가족'), findsOneWidget);
     expect(find.text('도움이 필요한 일'), findsOneWidget);
     expect(countValue(tester, 'help_count'), '1', reason: '승인 대기 1');
-    expect(countValue(tester, 'unread_count'), '2');
     expect(find.text('요청 확인하기'), findsOneWidget, reason: '홈에서는 바로 승인하지 않고 상세로 이동');
+    await reveal(tester, find.byKey(const ValueKey('unread_count')));
+    expect(countValue(tester, 'unread_count'), '2');
 
     env.backend.reportSensitiveEntry(elderId: MockBackend.momId, app: SensitiveApp.toss, choice: ConsentChoice.yes);
     env.backend.requestApproval(elderId: MockBackend.dadId, app: SensitiveApp.bank);
     await tester.pumpAndSettle();
+    await reveal(tester, find.byKey(const ValueKey('help_count')), up: true);
     expect(countValue(tester, 'help_count'), '2');
+    await reveal(tester, find.byKey(const ValueKey('unread_count')));
     expect(countValue(tester, 'unread_count'), '3');
     expect(find.text('어머니가 토스를 사용하려고 합니다.'), findsWidgets);
   });

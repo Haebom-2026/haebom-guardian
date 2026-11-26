@@ -30,6 +30,12 @@ ApprovalRequest pendingOf(TestEnv env) =>
 
 double topOf(WidgetTester tester, Finder f) => tester.getTopLeft(f).dy;
 
+/// 화면 아래로 밀려난 ListView 항목까지 스크롤 (홈 첫 문구·숫자 카드 아래에 있는 섹션 확인용)
+Future<void> reveal(WidgetTester tester, Finder f) async {
+  await tester.scrollUntilVisible(f, 150, scrollable: find.byType(Scrollable).first);
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('홈: 승인 대기는 "요청 확인하기"로 상세에 가서 결정한다 (홈에서 바로 승인·거절 버튼 없음)', (tester) async {
     final env = await pumpPhone(tester);
@@ -56,8 +62,11 @@ void main() {
     expect((tester.widget<Text>(find.byKey(const ValueKey('help_count')))).data, '3');
 
     // SOS·도움 필요는 "확인하지 않은 알림"에 다시 세지 않는다 (중복 없음)
+    await reveal(tester, find.byKey(const ValueKey('unread_count')));
     expect((tester.widget<Text>(find.byKey(const ValueKey('unread_count')))).data, '2');
 
+    await tester.ensureVisible(find.byKey(ValueKey('help_open_${sos.id}'), skipOffstage: false));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(ValueKey('help_open_${sos.id}')));
     await tester.pumpAndSettle();
     expect(find.text('알림 상세'), findsOneWidget);
@@ -73,6 +82,7 @@ void main() {
   testWidgets('홈: 최근 소식은 최대 3건, 확인 전 알림·승인 대기는 넣지 않는다', (tester) async {
     final env = await pumpPhone(tester);
     final a = pendingOf(env);
+    await reveal(tester, find.text('최근 소식'));
     final recentTop = topOf(tester, find.text('최근 소식'));
     // 최근 소식 영역(제목 아래)에 있는 줄 수
     int rowsBelow(Type type) =>

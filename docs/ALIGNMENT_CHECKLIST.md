@@ -14,7 +14,7 @@
 | A | **서버 담당** | "보호자 앱 담당이 서버(REST API·규칙·FCM·가족 연결)" (1장) | 서버·FCM 발송은 서버 담당 팀원 (11-25 결정) | 팀 전체 |
 | B | **서버 방식** | Firebase Functions | 별도 서버 구축·Blaze 가입 금지 원칙. Functions는 Blaze 필요 | 팀 전체 + 프로젝트 소유자 |
 | C | **보호자 "확인했어요" 기록** | Firestore는 두 앱 모두 **읽기만** (5.2 마지막) | 보호자 앱이 `notifications/{id}.readBy.{내 uid}`를 **직접 씀** | 서버 담당 (규칙으로 허용할지, API를 추가할지) |
-| D | **가족 호칭 필드** | `links.relationship` 하나 (보호자가 고른 "딸·아들") | `elderLabel`(어머니) + `guardianLabel`(딸) 두 개 (v2.2) | 고령자 앱 + 서버 |
+| D | ~~가족 호칭 필드~~ ✅ **합의 (11-26)** | 고령자 앱도 `elderLabel`·`guardianLabel` 두 개로 통일, `relationship` 사용 중단 | 동일 (v2.2). 옛 `relationship`은 elderLabel로 읽음 | 기존 `relationship` 값 이전 방법만 서버 담당이 결정 |
 
 - C를 규칙으로 허용할 경우 조건: 연결된 보호자가 `readBy`의 **자기 uid 키 하나만** 추가·갱신. 다른 필드 변경 불가.
 - D: 보호자 앱은 `relationship`만 와도 그 값을 `elderLabel`로 읽는다(동작함). 다만 고령자 앱이 "딸이 허락했어요"처럼 쓰려면 `guardianLabel`이 필요하다.
@@ -25,7 +25,7 @@
 
 | 컬렉션 | 필드 | 상태 |
 |---|---|---|
-| `links/{elderId}_{guardianId}` | elderId, guardianId, elderName, **elderLabel, guardianLabel** (또는 relationship), connectedAt(Timestamp) | ⚠️ D |
+| `links/{elderId}_{guardianId}` | elderId, guardianId, elderName, **elderLabel, guardianLabel**, connectedAt(Timestamp) | ✅ (D 합의) |
 | `notifications/{id}` | elderId, guardianIds[], appName, packageName, type, createdAt(Timestamp), readBy{uid: Timestamp}, level?, category?, reason? | ✅ (readBy 쓰기 주체는 ⚠️ C) |
 | `approvals/{id}` | elderId, guardianIds[], appName, packageName, action, status, createdAt, expiresAt, respondedAt, respondedBy, category? | ✅ |
 | `connectCodes/{code}` | elderId, expiresAt, used | ✅ 서버만 읽고 씀. 💡 `links.elderName`을 채울 수 있게 서버가 `users/{elderId}.name`을 읽거나 코드 문서에 이름을 함께 저장 |
@@ -60,7 +60,7 @@
 | 재시도 | 401 → 토큰 새로 받아 1번 / 403 `profile-required` → #2 후 1번 | ✅ 보호자 앱 11-26 구현 |
 | 재시도 | 503·네트워크 → 같은 키로 1번 | ⚠️ 보호자 앱은 **하지 않음** (아래 참고) |
 | #13 승인 응답 | `POST /v1/guardian/approvals/{id}/respond` `{ "decision": "approve" \| "reject" }` | ✅ |
-| #14 코드로 연결 | `POST /v1/guardian/links` `{ code, elderLabel, guardianLabel }` → `{ elderId, elderName, elderLabel, guardianLabel, connectedAt }` | ⚠️ D |
+| #14 코드로 연결 | `POST /v1/guardian/links` `{ code, elderLabel, guardianLabel }` → `{ elderId, elderName, elderLabel, guardianLabel, connectedAt }` | ✅ (D 합의) |
 | #15 보호자 쪽 해제 | `DELETE /v1/guardian/links/{elderId}` | ✅ |
 | #12 고령자 쪽 해제 | `DELETE /v1/elder/links/{guardianId}` | ✅ (고령자 앱 "할 일") |
 | #11 코드 발급 | `POST /v1/elder/connect-codes` → `{ code, expiresAt }` | ✅ (고령자 앱 "할 일") |

@@ -1,9 +1,12 @@
 // 가족의 도전 (💡 제안 단계, Mock 전용): 보호자가 직접 정해 보내고, 어르신이 [해 볼게요]/[다음에 할게요]를 고른다.
 // 돈·개인정보가 오가는 도전은 막는다. "다음에"는 보호자에게 거절로 보이지 않는다. 해내면 칭찬.
 import 'package:flutter_test/flutter_test.dart';
+import 'package:guardian_app/app/app.dart';
+import 'package:guardian_app/app/dependencies.dart';
 import 'package:guardian_app/models/challenge.dart';
 import 'package:guardian_app/repositories/guardian_repository.dart';
 import 'package:guardian_app/repositories/mock_backend.dart';
+import 'package:guardian_app/repositories/mock_repository.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'helpers.dart';
@@ -189,5 +192,84 @@ void main() {
     await tester.pumpAndSettle();
     await reveal(tester, find.byKey(ValueKey('cheer_${accepted.id}')));
     expect(find.byKey(ValueKey('cheer_${accepted.id}')), findsOneWidget);
+  });
+
+  tabTests();
+}
+
+/// 서버 모드처럼 도전을 지원하지 않는 저장소
+class _NoChallengeRepository extends MockGuardianRepository {
+  _NoChallengeRepository(super.backend);
+  @override
+  bool get supportsChallenges => false;
+}
+
+Future<void> openChallengeTab(WidgetTester tester) async {
+  await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('도전')));
+  await tester.pumpAndSettle();
+}
+
+void tabTests() {
+  testWidgets('도전 탭: 아래 바 5칸, 상태별 묶음과 이번 달 해낸 도전 수, 칭찬 대기 배지', (tester) async {
+    final env = await pumpPhone(tester);
+    expect(find.byType(NavigationDestination), findsNWidgets(5));
+    final bar = find.byType(NavigationBar);
+    expect(
+      find.descendant(of: bar, matching: find.text('1')),
+      findsWidgets,
+      reason: '칭찬 대기 1건 배지',
+    );
+
+    await openChallengeTab(tester);
+    expect(find.text('칭찬을 기다려요'), findsOneWidget);
+    expect(find.text('도전 중'), findsOneWidget);
+    expect(find.text('보낸 도전'), findsOneWidget);
+    expect(tester.widget<Text>(find.byKey(const Key('challenges_this_month'))).data, '1개');
+
+    // 칭찬하면 "지난 도전"으로 옮겨 간다
+    final done = env.backend.challengesFor(MockBackend.meId).firstWhere((c) => c.isDone);
+    env.backend.cheerChallenge(MockBackend.meId, done.id, cheerMessages.first);
+    await tester.pumpAndSettle();
+    expect(find.text('칭찬을 기다려요'), findsNothing);
+    await tester.scrollUntilVisible(find.text('지난 도전'), 150, scrollable: find.byType(Scrollable).last);
+    expect(find.text('지난 도전'), findsOneWidget);
+  });
+
+  testWidgets('도전 탭의 [도전 보내기]로 보낼 수 있다', (tester) async {
+    await pumpPhone(tester);
+    await openChallengeTab(tester);
+    await tester.tap(find.byKey(const Key('challenges_send')));
+    await tester.pumpAndSettle();
+    expect(find.text('도전 보내기'), findsWidgets);
+    expect(find.byKey(const Key('challenge_title_field')), findsOneWidget);
+  });
+
+  testWidgets('홈 "모든 도전 보기" → 도전 탭', (tester) async {
+    final env = await pumpPhone(tester);
+    env.backend.suggestChallenge(MockBackend.meId, MockBackend.momId, '버스 도착 시간 보기'); // 4개 → 홈에는 3개
+    await tester.pumpAndSettle();
+    await reveal(tester, find.byKey(const Key('home_all_challenges')));
+    await tester.tap(find.byKey(const Key('home_all_challenges')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('challenges_this_month')), findsOneWidget);
+  });
+
+  testWidgets('도전을 지원하지 않는 저장소(서버 모드)면 아래 바 4칸, 홈에 도전 섹션 없음', (tester) async {
+    tester.view.physicalSize = const Size(412, 915) * 3;
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final backend = MockBackend(clock: FakeClock().now);
+    final deps = AppDependencies(repository: _NoChallengeRepository(backend), notifier: FakeNotifier());
+    addTearDown(deps.dispose);
+    await tester.pumpWidget(HaebomFamilyApp(deps: deps));
+    await tester.pumpAndSettle();
+    expect(find.byType(NavigationDestination), findsNWidgets(4));
+    expect(find.descendant(of: find.byType(NavigationBar), matching: find.text('도전')), findsNothing);
+    await tester.scrollUntilVisible(find.text('최근 소식'), 150, scrollable: find.byType(Scrollable).first);
+    expect(find.text('가족의 도전'), findsNothing);
+    // 가족 탭은 마지막 칸 그대로
+    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('가족')));
+    await tester.pumpAndSettle();
+    expect(deps.tabIndex.value, 3);
   });
 }

@@ -1,11 +1,13 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../../app/dependencies.dart';
 import '../../app/theme.dart';
 import '../../controllers/guardian_store.dart';
 import '../../models/challenge.dart';
 import '../../repositories/guardian_repository.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
+import '../home_shell.dart';
 import 'send_challenge_screen.dart';
 
 /// 홈 "가족의 도전" 섹션 (💡 제안 단계, Mock 모드에서만 보인다).
@@ -57,17 +59,30 @@ class ChallengeSection extends StatelessWidget {
             children: [
               for (final (i, c) in items.take(limit).indexed) ...[
                 if (i > 0) const RowDivider(),
-                _ChallengeRow(challenge: c, store: store),
+                ChallengeRow(challenge: c, store: store),
               ],
             ],
+          ),
+        // 모든 도전(지난 도전 포함)은 도전 탭에서
+        if (store.challengesFor(elderId: elderId).length > items.take(limit).length)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: Space.page - 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                key: const Key('home_all_challenges'),
+                onPressed: () => AppScope.of(context).tabIndex.value = HomeShell.challengesTab,
+                child: const Text('모든 도전 보기 〉'),
+              ),
+            ),
           ),
       ],
     );
   }
 }
 
-class _ChallengeRow extends StatelessWidget {
-  const _ChallengeRow({required this.challenge, required this.store});
+class ChallengeRow extends StatelessWidget {
+  const ChallengeRow({super.key, required this.challenge, required this.store});
   final Challenge challenge;
   final GuardianStore store;
 

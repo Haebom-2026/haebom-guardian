@@ -87,6 +87,26 @@ void main() {
       expect(done.withHelp, isTrue, reason: '도우미 안내를 받아도 성공');
     });
 
+    test('취소: 내가 보낸, 해내기 전 도전만. 취소하면 모두의 목록에서 빠진다', () {
+      final c = b.suggestChallenge(MockBackend.meId, MockBackend.momId, '날씨 보기');
+      expect(
+        () => b.cancelChallenge(MockBackend.siblingId, c.id),
+        throwsA(isA<RepositoryException>().having((e) => e.code, 'code', RepositoryErrorCode.permissionDenied)),
+        reason: '다른 보호자가 보낸 도전은 취소 불가',
+      );
+      b.acceptChallenge(c.id);
+      b.cancelChallenge(MockBackend.meId, c.id);
+      expect(b.challengesFor(MockBackend.siblingId).where((x) => x.id == c.id), isEmpty);
+      final d = b.suggestChallenge(MockBackend.meId, MockBackend.momId, '버스 시간 보기');
+      b.acceptChallenge(d.id);
+      b.completeChallenge(d.id);
+      expect(
+        () => b.cancelChallenge(MockBackend.meId, d.id),
+        throwsA(isA<RepositoryException>()),
+        reason: '해낸 도전은 취소 불가',
+      );
+    });
+
     test('칭찬은 해낸 도전에만, 정해 둔 문구로, 보호자마다 하나', () {
       final c = b.suggestChallenge(MockBackend.meId, MockBackend.dadId, '날씨 보기');
       expect(() => b.cheerChallenge(MockBackend.meId, c.id, cheerMessages.first), throwsA(isA<RepositoryException>()));
@@ -233,6 +253,29 @@ void tabTests() {
     expect(find.text('칭찬을 기다려요'), findsNothing);
     await tester.scrollUntilVisible(find.text('지난 도전'), 150, scrollable: find.byType(Scrollable).last);
     expect(find.text('지난 도전'), findsOneWidget);
+  });
+
+  testWidgets('도전 탭: 내가 보낸 도전만 [보낸 도전 취소] → 확인 → 목록에서 빠짐', (tester) async {
+    final env = await pumpPhone(tester);
+    final all = env.backend.challengesFor(MockBackend.meId);
+    final sent = all.firstWhere((c) => c.status == ChallengeStatus.sent);
+    final done = all.firstWhere((c) => c.isDone);
+    await openChallengeTab(tester);
+    expect(find.byKey(ValueKey('cancel_${done.id}')), findsNothing, reason: '해낸 도전은 취소 없음');
+    await tester.scrollUntilVisible(
+      find.byKey(ValueKey('cancel_${sent.id}')),
+      150,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.drag(find.byType(Scrollable).last, const Offset(0, -200));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(ValueKey('cancel_${sent.id}')));
+    await tester.pumpAndSettle();
+    expect(find.text('보낸 도전을 취소할까요?'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('confirm_dialog_ok')));
+    await tester.pumpAndSettle();
+    expect(env.backend.challengesFor(MockBackend.meId).where((c) => c.id == sent.id), isEmpty);
+    expect(find.byKey(ValueKey('challenge_${sent.id}')), findsNothing);
   });
 
   testWidgets('도전 탭의 [도전 보내기]로 보낼 수 있다', (tester) async {

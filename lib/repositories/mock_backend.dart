@@ -350,6 +350,16 @@ class MockBackend {
   Challenge? completeChallenge(String id, {bool withHelp = false}) =>
       _elderSets(id, ChallengeStatus.accepted, ChallengeStatus.done, withHelp: withHelp);
 
+  /// 보호자가 보낸 도전 취소: 해내기 전(sent·later·accepted)이고 내가 보낸 것만. 목록에서 빠진다
+  /// (고령자 앱은 받은 목록을 그대로 따라간다. 어르신께 따로 알림은 가지 않는다).
+  void cancelChallenge(String guardianId, String id) {
+    final c = challengeFor(guardianId, id);
+    if (c.suggestedBy != guardianId) throw const RepositoryException(RepositoryErrorCode.permissionDenied, '내가 보낸 도전만 취소할 수 있어요.');
+    if (c.isDone) throw const RepositoryException(RepositoryErrorCode.invalidArgument, '이미 해낸 도전은 취소할 수 없어요.');
+    _challenges.remove(id);
+    _notify();
+  }
+
   /// 해낸 도전에 칭찬 보내기 (보호자마다 한 번)
   void cheerChallenge(String guardianId, String id, String message) {
     final c = challengeFor(guardianId, id);

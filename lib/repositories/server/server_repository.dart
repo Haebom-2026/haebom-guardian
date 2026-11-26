@@ -364,6 +364,10 @@ class ServerGuardianRepository implements GuardianRepository {
       Future.error(const RepositoryException(RepositoryErrorCode.unavailable, '서버에 도전 기능 없음'));
 
   @override
+  Future<void> cancelChallenge(String id) =>
+      Future.error(const RepositoryException(RepositoryErrorCode.unavailable, '서버에 도전 기능 없음'));
+
+  @override
   Future<void> refresh() async {
     if (!_apiMode) return;
     await Future.wait([linkFeed!.refresh(), notificationFeed!.refresh()]);

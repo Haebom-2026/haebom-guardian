@@ -101,6 +101,9 @@ abstract class GuardianRepository {
   /// 해낸 도전에 칭찬 보내기
   Future<void> cheerChallenge(String id, String message);
 
+  /// 내가 보낸 도전 취소 (해내기 전만)
+  Future<void> cancelChallenge(String id);
+
   /// 화면을 당겨 새로고침할 때: 서버에서 가족·알림·승인을 다시 조회한다 (실시간 구독 저장소는 할 일 없음)
   Future<void> refresh();
 }

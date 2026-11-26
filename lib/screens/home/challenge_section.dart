@@ -82,9 +82,12 @@ class ChallengeSection extends StatelessWidget {
 }
 
 class ChallengeRow extends StatelessWidget {
-  const ChallengeRow({super.key, required this.challenge, required this.store});
+  const ChallengeRow({super.key, required this.challenge, required this.store, this.showCancel = false});
   final Challenge challenge;
   final GuardianStore store;
+
+  /// 내가 보낸, 아직 해내지 않은 도전에 [보낸 도전 취소] (도전 탭에서만)
+  final bool showCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -140,6 +143,20 @@ class ChallengeRow extends StatelessWidget {
                   key: ValueKey('challenge_status_${c.id}'),
                   style: t.textTheme.bodySmall?.copyWith(color: k.textSub),
                 ),
+                if (showCancel && !c.isDone && c.suggestedBy == me)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: TextButton(
+                      key: ValueKey('cancel_${c.id}'),
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        foregroundColor: k.textSub,
+                      ),
+                      onPressed: () => cancelChallenge(context, store, c),
+                      child: const Text('보낸 도전 취소'),
+                    ),
+                  ),
                 // 버튼은 글 아래에 (오른쪽에 두면 제목·설명이 좁아져 여러 줄로 접힌다)
                 if (c.isDone) ...[
                   const SizedBox(height: 10),
@@ -167,6 +184,25 @@ class ChallengeRow extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// 보낸 도전 취소: 확인 후 목록에서 뺀다 (어르신 화면에서도 사라지고, 따로 알림은 가지 않는다)
+Future<void> cancelChallenge(BuildContext context, GuardianStore store, Challenge c) async {
+  final name = store.nameOf(c.elderId);
+  final ok = await confirmDialog(
+    context,
+    title: '보낸 도전을 취소할까요?',
+    message: '"${c.title}"\n$name 화면에서도 사라져요. $name께 따로 알림은 가지 않아요.',
+    confirmLabel: '도전 취소',
+    destructive: true,
+  );
+  if (!ok) return;
+  try {
+    await store.cancelChallenge(c.id);
+    if (context.mounted) showMessage(context, '보낸 도전을 취소했어요.');
+  } on RepositoryException catch (e) {
+    if (context.mounted) showMessage(context, e.detail ?? e.userMessage);
   }
 }
 

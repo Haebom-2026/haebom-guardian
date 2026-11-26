@@ -49,7 +49,7 @@ class ChallengesScreen extends StatelessWidget {
                     children: [
                       for (final (i, c) in items.indexed) ...[
                         if (i > 0) const RowDivider(),
-                        ChallengeRow(challenge: c, store: store),
+                        ChallengeRow(challenge: c, store: store, showCancel: true),
                       ],
                     ],
                   ),

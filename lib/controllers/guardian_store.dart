@@ -121,6 +121,8 @@ class GuardianStore extends ChangeNotifier {
 
   Future<void> cheerChallenge(String id, String message) => repository.cheerChallenge(id, message);
 
+  Future<void> cancelChallenge(String id) => repository.cancelChallenge(id);
+
     int unreadCount({String? elderId}) => notificationsFor(elderId: elderId, unreadOnly: true).length;
 
   int todayCount({String? elderId}) {

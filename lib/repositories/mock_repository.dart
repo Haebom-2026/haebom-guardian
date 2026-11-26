@@ -86,6 +86,9 @@ class MockGuardianRepository implements GuardianRepository {
   Future<void> cheerChallenge(String id, String message) =>
       _call(() => backend.cheerChallenge(guardianId, id, message));
 
+  @override
+  Future<void> cancelChallenge(String id) => _call(() => backend.cancelChallenge(guardianId, id));
+
   /// Mock은 실시간으로 반영되므로 할 일 없음
   @override
   Future<void> refresh() async {}

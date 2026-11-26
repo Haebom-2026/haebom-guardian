@@ -10,6 +10,15 @@
 
 ## 2. 현재 상태
 
+### 11-26 밤: 서버 기획(초안 v0.1) 수신 → 답변 `docs/SERVER_PLAN_REVIEW.md`
+- 서버 확정 스택: **AWS Lambda + API Gateway + DynamoDB (TypeScript, Terraform)**. Firebase는 Auth·FCM만. → 보호자 앱의 Firestore 구독·readBy 쓰기·`config/server`는 **GET API(#20~#24) + FCM + 폴링으로 교체 예정** (`lib/repositories/server/`만, 서버 응답 확정 후 착수)
+- 답변 문서의 수정 요청: 호칭 `elderLabel`·`guardianLabel`(기획은 relationship), 오류 reason 세분화(`conflict`·`code-invalid` → 기존 reason), 지난 승인 조회, FCM data 필드. #13 decision은 서버 값 `approved`/`rejected`로 **보호자 앱이 맞추기로 함**(아직 코드 미반영)
+- iPhone은 APNs 없음 → 앱이 앞에 있을 때 5초 폴링 제안, `since` 조회 요청
+- 고령자 앱 담당 답변(11-26): 호칭 두 필드 합의(ALIGNMENT D 해결), 다대다·해제·연결 코드 규칙 일치. `guardian-mock-contract.md`는 아직 못 받음
+- **dev 서버 주소**: `https://qq829otaql.execute-api.ap-northeast-2.amazonaws.com` (11-26 확인: `/v1/healthz` 200 `{"status":"ok","env":"dev"}`, `/v1/guardian/links` 토큰 없이 401 → JWT 검증 동작. S1~S3 API 동작 여부는 미확인). 401 본문은 `{"message":"Unauthorized"}`(API Gateway 기본)지만 앱은 상태 코드로 처리하므로 문제없음
+- **대기 중**: 서버 담당자의 `SERVER_PLAN_REVIEW.md` 답변 → 받으면 `lib/repositories/server/`를 GET+FCM+폴링으로 전환, #13 decision 값 변경
+- 서비스 계정 키: 사용자가 새로 발급해 서버 담당에게 전달 예정 (`~/Downloads`, 저장소에 없음). 보호자 앱은 사용 안 함
+
 ### 11-26: 새 저장소 이동 · 실제 서버 연동 준비
 - **위치 변경**: `~/Desktop/해봄/haebom_guardian` ← GitHub `Haebom-2026/haebom-guardian`, 브랜치 `feature/guardian-app`. 옛 `바이브 코딩/guardian_app`과 내용 동일 확인 후 복사(`config/firebase.json`은 사용자가 직접 복사)
 - **GitHub 단계별 올리기 (7단계 중 3단계까지 push)**: 1 프로젝트 설정 `7e14f88` · 2 데이터 모델 `6062fa7` · 3 Mock 서버·저장소 `4ea1c4a` / 남음: 4 화면·알림 · 5 서버 연동 · 6 테스트 · 7 문서. **사용자가 "올려"라고 할 때만** push. PR은 7단계 뒤 (gh CLI 없음 → 웹에서 생성). 앱은 5단계부터 빌드됨

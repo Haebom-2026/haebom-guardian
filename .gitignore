@@ -57,3 +57,8 @@ google-services.json
 GoogleService-Info.plist
 *service-account*.json
 *-firebase-adminsdk-*.json
+
+# 문서(.md)는 저장소에 올리지 않는다 (내부 정보 포함). README.md만 예외
+*.md
+!README.md
+!**/README.md

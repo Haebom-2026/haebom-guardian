@@ -99,5 +99,6 @@ docs/INTEGRATION.md         고령자 앱 연동 규격
 ```
 
 ## 현재 제한 사항
-- Firebase(Auth/Firestore/Functions/FCM) 미연결 — 데이터는 앱 메모리에만 있고 재시작 시 초기화됩니다.
-- 알림 설정은 메모리에만 저장됩니다.
+- 기본(Mock) 모드에서는 데이터가 앱 메모리에만 있어 재시작하면 초기화됩니다. 실제 서버 모드는 `--dart-define-from-file=config/firebase.json`으로 실행합니다.
+- 실제 서버와의 연결은 서버 완성 후 검증 예정입니다.
+- iPhone은 원격 푸시(APNs)를 쓰지 않아 앱이 켜져 있을 때만 알림을 받습니다.

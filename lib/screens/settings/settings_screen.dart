@@ -54,10 +54,11 @@ class SettingsScreen extends StatelessWidget {
               const _GroupLabel('잠금 화면'),
               CardGroup(children: [
                 SwitchListTile(
-                  title: const Text('알림에 상세 내용 표시'),
-                  subtitle: const Text('끄면 "새 가족 알림이 도착했습니다"만 표시'),
-                  value: settings.showDetailsInNotification,
-                  onChanged: (v) => settings.showDetailsInNotification = v,
+                  title: const Text('간략하게 보기'),
+                  subtitle: const Text('켜면 누가 어떤 앱을 썼는지 빼고 "새 가족 알림이 도착했습니다"만 표시. '
+                      '잠금 화면에서는 휴대폰 설정에 따라 내용이 숨겨집니다'),
+                  value: settings.briefNotifications,
+                  onChanged: (v) => settings.briefNotifications = v,
                 ),
                 divider,
                 ListTile(

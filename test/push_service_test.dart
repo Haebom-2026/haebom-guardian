@@ -152,16 +152,31 @@ void main() {
   });
 
   group('로컬 알림과 원격 푸시 중복 방지', () {
-    test('포그라운드 FCM 메시지 → 로컬 알림 1개, 같은 문서가 Firestore로 와도 다시 띄우지 않음', () async {
+    test('포그라운드 FCM 메시지가 목록보다 먼저 오면 잠깐 기다렸다가, 끝내 목록에 없으면 최소 문구로 1개만 띄움', () async {
       env.clock.advance(Duration.zero);
+      env.deps.notifications.remoteFallbackDelay = const Duration(milliseconds: 10);
       await push.start();
-      // FCM이 먼저 도착 (아직 Firestore에는 없음)
+      // FCM이 먼저 도착 (아직 목록에는 없음)
       messaging.foreground.add(const PushMessage({'kind': 'notification', 'id': 'n_push', 'type': 'stuck'}));
       await settle();
+      expect(env.notifier.shown, isEmpty, reason: '목록이 들어오면 자세한 문구로 띄우려고 기다림');
+      await Future<void>.delayed(const Duration(milliseconds: 30));
       expect(env.notifier.shown, hasLength(1));
       expect(env.notifier.shown.single.body, '가족에게 도움이 필요할 수 있습니다. 앱에서 확인해 주세요.');
       // 같은 메시지가 다시 와도 무시
       env.deps.notifications.showRemote(const AlertTarget('notification', 'n_push'), type: 'stuck');
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(env.notifier.shown, hasLength(1));
+    });
+
+    test('FCM 뒤 목록이 바로 들어오면 자세한 문구로 띄움 (기본: 간략하게 보기 꺼짐)', () async {
+      await push.start();
+      final (_, n) = env.backend.reportSensitiveEntry(
+          elderId: MockBackend.momId, app: SensitiveApp.toss, choice: ConsentChoice.yes);
+      await settle();
+      expect(env.notifier.shown.single.body, '어머니가 토스를 사용하려고 합니다.');
+      messaging.foreground.add(PushMessage({'kind': 'notification', 'id': n!.id}));
+      await settle();
       expect(env.notifier.shown, hasLength(1));
     });
 

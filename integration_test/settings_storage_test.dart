@@ -10,17 +10,17 @@ void main() {
     final storage = DeviceSettingsStorage();
     final original = await storage.load();
 
-    final a = SettingsController(storage: storage)..showDetailsInNotification = true;
+    final a = SettingsController(storage: storage)..briefNotifications = true;
     a.sosAlerts = false;
     await Future<void>.delayed(const Duration(milliseconds: 300));
 
     final b = SettingsController(storage: DeviceSettingsStorage());
     await b.load();
-    expect(b.showDetailsInNotification, isTrue);
+    expect(b.briefNotifications, isTrue);
     expect(b.sosAlerts, isFalse);
 
     // 원래 값으로 되돌린다 (없던 키는 기본값으로)
-    await storage.save(SettingsController.kShowDetails, original[SettingsController.kShowDetails] ?? false);
+    await storage.save(SettingsController.kBrief, original[SettingsController.kBrief] ?? false);
     await storage.save(SettingsController.kSos, original[SettingsController.kSos] ?? true);
   });
 }

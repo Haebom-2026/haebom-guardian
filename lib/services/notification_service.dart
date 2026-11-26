@@ -125,8 +125,7 @@ class PluginLocalNotifier implements LocalNotifier {
         if (target != null) onTap(target);
       },
     );
-    final android = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     for (final c in _channels.values) {
       await android?.createNotificationChannel(c);
     }
@@ -135,13 +134,11 @@ class PluginLocalNotifier implements LocalNotifier {
   @override
   Future<bool> requestPermission() async {
     if (defaultTargetPlatform == TargetPlatform.android) {
-      final android = _plugin.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
+      final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
       return await android?.requestNotificationsPermission() ?? false;
     }
     if (defaultTargetPlatform == TargetPlatform.iOS) {
-      final ios =
-          _plugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+      final ios = _plugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
       return await ios?.requestPermissions(alert: true, badge: true, sound: true) ?? false;
     }
     return false;
@@ -263,33 +260,59 @@ class NotificationService {
   /// 저장소 경로와 같은 중복 방지 집합을 쓰므로, 둘 중 먼저 온 쪽만 표시된다.
   void showRemote(AlertTarget target, {String? type}) {
     if (target.kind == AlertTarget.notification) {
-      if (!_seenNotifications.add(target.id)) return;
+      if (_seenNotifications.contains(target.id)) return;
       final n = store.notifications.where((x) => x.id == target.id).firstOrNull;
-      if (n != null) return _alertNotification(n);
-      // 아직 Firestore 구독에 문서가 도착하지 않음 → 최소 문구로 표시
-      final t = NotificationType.fromCode(type ?? '');
-      final channel = channelForType(t);
-      if (!_enabled(channel)) return;
-      notifier.show(LocalAlert(
+      if (n != null) {
+        _seenNotifications.add(n.id);
+        return _alertNotification(n);
+      }
+      // 아직 목록에 없음(서버에서 다시 조회 중) → 목록에 들어오면 저장소 경로가 자세한 문구로 띄운다.
+      // [remoteFallbackDelay] 안에 들어오지 않으면 최소 문구로라도 띄운다.
+      Timer(remoteFallbackDelay, () {
+        if (_disposed) return;
+        final late = store.notifications.where((x) => x.id == target.id).firstOrNull;
+        if (!_seenNotifications.add(target.id)) return;
+        if (late != null) return _alertNotification(late);
+        _showMinimalRemote(target, type);
+      });
+    } else if (target.kind == AlertTarget.approval) {
+      _showRemoteApproval(target);
+    }
+  }
+
+  /// FCM 뒤 목록이 들어오기를 기다리는 최대 시간
+  Duration remoteFallbackDelay = const Duration(seconds: 6);
+  bool _disposed = false;
+
+  void _showMinimalRemote(AlertTarget target, String? type) {
+    final t = NotificationType.fromCode(type ?? '');
+    final channel = channelForType(t);
+    if (!_enabled(channel)) return;
+    notifier.show(
+      LocalAlert(
         id: idFor(target.id),
         channel: channel,
         title: titleFor(channel),
         body: minimalBody(t),
         target: target,
-      ));
-    } else if (target.kind == AlertTarget.approval) {
-      if (!_seenApprovals.add(target.id)) return;
-      final a = store.approvals.where((x) => x.id == target.id).firstOrNull;
-      if (a != null) return _alertApproval(a);
-      if (!settings.approvalAlerts) return;
-      notifier.show(LocalAlert(
+      ),
+    );
+  }
+
+  void _showRemoteApproval(AlertTarget target) {
+    if (!_seenApprovals.add(target.id)) return;
+    final a = store.approvals.where((x) => x.id == target.id).firstOrNull;
+    if (a != null) return _alertApproval(a);
+    if (!settings.approvalAlerts) return;
+    notifier.show(
+      LocalAlert(
         id: idFor(target.id),
         channel: AlertChannel.approval,
         title: '해봄 가족 · 승인 요청',
         body: '확인이 필요한 요청이 도착했습니다.',
         target: target,
-      ));
-    }
+      ),
+    );
   }
 
   final Set<String> _seenUntargeted = {};
@@ -297,21 +320,23 @@ class NotificationService {
   /// 상세 화면 대상이 없는 원격 메시지(예: 콘솔 테스트 메시지)를 앱이 앞에 있을 때 표시한다.
   void showUntargeted(String key, {String? title, String? body}) {
     if (!settings.activityAlerts || !_seenUntargeted.add(key)) return;
-    notifier.show(LocalAlert(
-      id: idFor('untargeted:$key'),
-      channel: AlertChannel.activity,
-      title: title ?? '해봄 가족',
-      body: body ?? '새 가족 알림이 도착했습니다.',
-      target: null,
-    ));
+    notifier.show(
+      LocalAlert(
+        id: idFor('untargeted:$key'),
+        channel: AlertChannel.activity,
+        title: title ?? '해봄 가족',
+        body: body ?? '새 가족 알림이 도착했습니다.',
+        target: null,
+      ),
+    );
   }
 
   /// 잠금 화면용 최소 문구 (FCM 서버 payload와 같은 문구)
   static String minimalBody(NotificationType t) => switch (t) {
-        NotificationType.sos => '가족이 도움을 요청했습니다. 앱에서 확인해 주세요.',
-        NotificationType.stuck => '가족에게 도움이 필요할 수 있습니다. 앱에서 확인해 주세요.',
-        NotificationType.sensitiveEntry => '새 가족 알림이 도착했습니다.',
-      };
+    NotificationType.sos => '가족이 도움을 요청했습니다. 앱에서 확인해 주세요.',
+    NotificationType.stuck => '가족에게 도움이 필요할 수 있습니다. 앱에서 확인해 주세요.',
+    NotificationType.sensitiveEntry => '새 가족 알림이 도착했습니다.',
+  };
 
   /// 문서 ID → 로컬 알림 id. 같은 문서는 항상 같은 id라 다시 표시돼도 알림창에 하나만 남는다.
   /// (String.hashCode는 실행마다 달라질 수 있어 고정 해시를 쓴다)
@@ -328,52 +353,57 @@ class NotificationService {
       n.isScam || n.level == SensitivityLevel.l3 ? AlertChannel.sos : channelForType(n.type);
 
   static AlertChannel channelForType(NotificationType t) => switch (t) {
-        NotificationType.sos => AlertChannel.sos,
-        NotificationType.stuck => AlertChannel.help,
-        NotificationType.sensitiveEntry => AlertChannel.activity,
-      };
+    NotificationType.sos => AlertChannel.sos,
+    NotificationType.stuck => AlertChannel.help,
+    NotificationType.sensitiveEntry => AlertChannel.activity,
+  };
 
   static String titleFor(AlertChannel c) => switch (c) {
-        AlertChannel.sos => '해봄 가족 · 긴급',
-        AlertChannel.help => '해봄 가족 · 도움 필요',
-        AlertChannel.approval => '해봄 가족 · 승인 요청',
-        AlertChannel.activity => '해봄 가족',
-      };
+    AlertChannel.sos => '해봄 가족 · 긴급',
+    AlertChannel.help => '해봄 가족 · 도움 필요',
+    AlertChannel.approval => '해봄 가족 · 승인 요청',
+    AlertChannel.activity => '해봄 가족',
+  };
 
   /// 설정 스위치: 긴급(SOS·사기 의심)은 SOS 알림, 막힘·앱 이용은 앱 이용 알림을 따른다.
   bool _enabled(AlertChannel c) => switch (c) {
-        AlertChannel.sos => settings.sosAlerts,
-        AlertChannel.approval => settings.approvalAlerts,
-        AlertChannel.help || AlertChannel.activity => settings.activityAlerts,
-      };
+    AlertChannel.sos => settings.sosAlerts,
+    AlertChannel.approval => settings.approvalAlerts,
+    AlertChannel.help || AlertChannel.activity => settings.activityAlerts,
+  };
 
   void _alertNotification(NotificationItem n) {
     final channel = channelFor(n);
     if (!_enabled(channel)) return;
     final detail = notificationMessage(n, store.nameOf(n.elderId));
     final minimal = minimalBody(n.type);
-    notifier.show(LocalAlert(
-      id: idFor(n.id),
-      channel: channel,
-      title: titleFor(channel),
-      body: settings.showDetailsInNotification ? detail : minimal,
-      target: AlertTarget(AlertTarget.notification, n.id),
-    ));
+    notifier.show(
+      LocalAlert(
+        id: idFor(n.id),
+        channel: channel,
+        title: titleFor(channel),
+        body: settings.showDetailsInNotification ? detail : minimal,
+        target: AlertTarget(AlertTarget.notification, n.id),
+      ),
+    );
   }
 
   void _alertApproval(ApprovalRequest a) {
     if (!settings.approvalAlerts) return;
     final who = store.nameOf(a.elderId);
-    notifier.show(LocalAlert(
-      id: idFor(a.id),
-      channel: AlertChannel.approval,
-      title: '해봄 가족 · 승인 요청',
-      body: settings.showDetailsInNotification
-          ? approvalAlertDetail(a, who)
-          : '확인이 필요한 요청이 도착했습니다.',
-      target: AlertTarget(AlertTarget.approval, a.id),
-    ));
+    notifier.show(
+      LocalAlert(
+        id: idFor(a.id),
+        channel: AlertChannel.approval,
+        title: '해봄 가족 · 승인 요청',
+        body: settings.showDetailsInNotification ? approvalAlertDetail(a, who) : '확인이 필요한 요청이 도착했습니다.',
+        target: AlertTarget(AlertTarget.approval, a.id),
+      ),
+    );
   }
 
-  void dispose() => store.removeListener(_onStoreChanged);
+  void dispose() {
+    _disposed = true;
+    store.removeListener(_onStoreChanged);
+  }
 }

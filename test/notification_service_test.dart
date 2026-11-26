@@ -22,7 +22,8 @@ void main() {
     expect(env.notifier.shown, isEmpty);
   });
 
-  test('새 알림이 오면 최소 문구로 로컬 알림을 표시한다 (잠금 화면 보호)', () async {
+  test('간략하게 보기를 켜면 최소 문구로 로컬 알림을 표시한다', () async {
+    env.deps.settings.briefNotifications = true;
     final (_, n) = env.backend
         .reportSensitiveEntry(elderId: MockBackend.momId, app: SensitiveApp.gov24, choice: ConsentChoice.yes);
     await flush();
@@ -34,8 +35,7 @@ void main() {
     expect(alert.channel, AlertChannel.activity);
   });
 
-  test('상세 표시 설정을 켜면 서비스 이름을 포함한다', () async {
-    env.deps.settings.showDetailsInNotification = true;
+  test('기본은 자세히: 누가 어떤 서비스를 쓰는지 포함한다 (잠금 화면은 비공개 알림으로 보호)', () async {
     env.backend.reportSensitiveEntry(elderId: MockBackend.momId, app: SensitiveApp.gov24, choice: ConsentChoice.yes);
     await flush();
     expect(env.notifier.shown.single.body, '어머니가 정부24를 사용하려고 합니다.');

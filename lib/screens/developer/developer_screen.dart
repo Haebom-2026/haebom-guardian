@@ -238,10 +238,10 @@ class _DeveloperScreenState extends State<DeveloperScreen> {
                 return SwitchListTile(
                   key: const Key('scenario_detail_switch'),
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('알림에 상세 내용 표시'),
+                  title: const Text('알림 간략하게 보기'),
                   subtitle: const Text('설정 화면의 같은 항목과 연동됩니다'),
-                  value: settings.showDetailsInNotification,
-                  onChanged: (v) => settings.showDetailsInNotification = v,
+                  value: settings.briefNotifications,
+                  onChanged: (v) => settings.briefNotifications = v,
                 );
               },
             ),

@@ -51,27 +51,31 @@ class SettingsController extends ChangeNotifier {
   static const kActivity = 'activityAlerts';
   static const kApproval = 'approvalAlerts';
   static const kSos = 'sosAlerts';
-  static const kShowDetails = 'showDetailsInNotification';
-  static const keys = [kActivity, kApproval, kSos, kShowDetails];
+  static const kBrief = 'briefNotifications';
+  static const keys = [kActivity, kApproval, kSos, kBrief];
 
   bool _activityAlerts = true;
   bool _approvalAlerts = true;
   bool _sosAlerts = true;
-  bool _showDetailsInNotification = false;
+  bool _briefNotifications = false;
 
   /// 민감 앱 이용/도움 필요 알림
   bool get activityAlerts => _activityAlerts;
   bool get approvalAlerts => _approvalAlerts;
   bool get sosAlerts => _sosAlerts;
 
-  /// 기기 알림(잠금 화면 포함)에 "어머니가 정부24를 사용하려고 합니다" 같은 상세 문구 표시 여부.
-  /// 기본값은 꺼짐 → "새 알림이 도착했습니다"처럼 최소 문구만 표시.
-  bool get showDetailsInNotification => _showDetailsInNotification;
+  /// 간략하게 보기. 기본값은 꺼짐 → 기기 알림에 "어머니가 정부24를 사용하려고 합니다"처럼 자세히 표시
+  /// (잠금 화면에서는 알림을 '비공개'로 띄워 휴대폰 설정에 따라 내용을 숨긴다).
+  /// 켜면 잠금이 풀려 있어도 "새 가족 알림이 도착했습니다" 같은 최소 문구만 표시.
+  bool get briefNotifications => _briefNotifications;
+
+  /// 기기 알림에 자세한 문구를 쓸지 ([briefNotifications]의 반대)
+  bool get showDetailsInNotification => !_briefNotifications;
 
   set activityAlerts(bool v) => _set(kActivity, v, () => _activityAlerts = v);
   set approvalAlerts(bool v) => _set(kApproval, v, () => _approvalAlerts = v);
   set sosAlerts(bool v) => _set(kSos, v, () => _sosAlerts = v);
-  set showDetailsInNotification(bool v) => _set(kShowDetails, v, () => _showDetailsInNotification = v);
+  set briefNotifications(bool v) => _set(kBrief, v, () => _briefNotifications = v);
 
   /// 저장된 값을 불러온다. 읽기에 실패하면 기본값을 유지한다.
   Future<void> load() async {
@@ -85,7 +89,7 @@ class SettingsController extends ChangeNotifier {
     _activityAlerts = saved[kActivity] ?? _activityAlerts;
     _approvalAlerts = saved[kApproval] ?? _approvalAlerts;
     _sosAlerts = saved[kSos] ?? _sosAlerts;
-    _showDetailsInNotification = saved[kShowDetails] ?? _showDetailsInNotification;
+    _briefNotifications = saved[kBrief] ?? _briefNotifications;
     notifyListeners();
   }
 

@@ -6,7 +6,7 @@
 고령자 스마트폰 AI 도우미 **해봄**의 보호자용 앱입니다. 가족이 동의한 민감 서비스 이용 알림을 받고, 해봄 도우미의 진행 승인 요청에 응답하며, 6자리 코드로 가족을 연결합니다.
 
 - 플랫폼: Android · iOS (Flutter)
-- 현재 단계: **Mock 서버로 동작** (Firebase 미연결)
+- 현재 단계: 기본은 **Mock 데이터로 동작**. 서버 연동(Firebase 로그인·FCM 수신·서버 API)은 구현 완료, 실제 서버 연결 대기 중
 - 고령자 앱(Kotlin)은 별도 저장소/팀원 담당이며 이 프로젝트 범위가 아닙니다.
 - 연동 규격: [docs/INTEGRATION.md](docs/INTEGRATION.md)
 
@@ -22,7 +22,7 @@
 
 ## 개발 환경 설정 (macOS, Apple Silicon)
 
-이 컴퓨터에서 확인된 버전 (2026-11-24):
+이 컴퓨터에서 확인된 버전 (2026-11-26):
 Flutter 3.50.1 / Dart 3.14.0 / Xcode 27.2 / Android SDK (platform android-37.0, build-tools 36.0.0) / Android Studio 내장 JBR
 
 1. **Flutter SDK** — `~/development/flutter` (git clone, stable 채널)
@@ -50,7 +50,7 @@ Flutter 3.50.1 / Dart 3.14.0 / Xcode 27.2 / Android SDK (platform android-37.0, 
 ## 실행
 
 ```bash
-cd guardian_app
+cd haebom_guardian
 flutter pub get
 
 # Android 에뮬레이터
@@ -74,7 +74,7 @@ flutter run -d "iPhone 18 Pro"
 
 ```bash
 flutter analyze
-flutter test                                   # 단위·위젯 테스트 (59개)
+flutter test                                   # 단위·위젯 테스트 (157개)
 flutter test integration_test -d <device-id>   # 실기기/시뮬레이터 통합 테스트
 ```
 
@@ -101,4 +101,3 @@ docs/INTEGRATION.md         고령자 앱 연동 규격
 ## 현재 제한 사항
 - Firebase(Auth/Firestore/Functions/FCM) 미연결 — 데이터는 앱 메모리에만 있고 재시작 시 초기화됩니다.
 - 알림 설정은 메모리에만 저장됩니다.
-- 앱 아이콘은 아직 Flutter 기본 아이콘입니다.

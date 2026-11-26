@@ -112,7 +112,7 @@ class PluginLocalNotifier implements LocalNotifier {
   Future<void> initialize(void Function(AlertTarget target) onTap) async {
     await _plugin.initialize(
       settings: const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        android: AndroidInitializationSettings('@drawable/ic_stat_haebom') /* 흰 잎사귀 실루엣 (상태 표시줄용) */,
         // 권한은 앱 시작 후 requestPermission()에서 명시적으로 요청한다.
         iOS: DarwinInitializationSettings(
           requestAlertPermission: false,

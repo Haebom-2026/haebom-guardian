@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/dependencies.dart';
 import '../../app/routes.dart';
+import '../../app/theme.dart';
 import '../../services/push_service.dart';
 import '../../widgets/common.dart';
 
@@ -17,7 +18,7 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final deps = AppScope.of(context);
     final settings = deps.settings;
-    final t = Theme.of(context);
+    const divider = Divider(indent: Space.page, endIndent: Space.page);
     return Scaffold(
       appBar: AppBar(title: const Text('설정')),
       body: SafeArea(
@@ -25,115 +26,88 @@ class SettingsScreen extends StatelessWidget {
         child: ListenableBuilder(
           listenable: settings,
           builder: (context, _) => ListView(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+            padding: const EdgeInsets.only(bottom: 32),
             children: [
-              const SectionHeader('알림 설정'),
-              Card(
-                child: Column(
-                  children: [
-                    SwitchListTile(
-                      title: const Text('앱 이용 알림'),
-                      subtitle: const Text('가족이 동의한 민감 서비스 이용, 도움 필요 알림'),
-                      value: settings.activityAlerts,
-                      onChanged: (v) => settings.activityAlerts = v,
-                    ),
-                    const Divider(indent: 16, endIndent: 16),
-                    SwitchListTile(
-                      title: const Text('승인 요청 알림'),
-                      subtitle: const Text('도우미 진행 승인 요청'),
-                      value: settings.approvalAlerts,
-                      onChanged: (v) => settings.approvalAlerts = v,
-                    ),
-                    const Divider(indent: 16, endIndent: 16),
-                    SwitchListTile(
-                      title: const Text('SOS 알림'),
-                      subtitle: const Text('SOS·사기 의심 알림. 끄지 않는 것을 권장합니다'),
-                      value: settings.sosAlerts,
-                      onChanged: (v) => settings.sosAlerts = v,
-                    ),
-                    const Divider(indent: 16, endIndent: 16),
-                    SwitchListTile(
-                      title: const Text('알림에 상세 내용 표시'),
-                      subtitle: const Text('끄면 잠금 화면에 "새 가족 알림이 도착했습니다"처럼 최소한의 문구만 표시합니다'),
-                      value: settings.showDetailsInNotification,
-                      onChanged: (v) => settings.showDetailsInNotification = v,
-                    ),
-                    const Divider(indent: 16, endIndent: 16),
-                    ListTile(
-                      leading: const Icon(Icons.notifications_active_outlined),
-                      title: const Text('기기 알림 권한 확인'),
-                      subtitle: const Text('알림이 오지 않으면 권한을 다시 요청해 보세요'),
-                      onTap: () async {
-                        final granted = await deps.notifications.requestPermission();
-                        if (context.mounted) {
-                          showMessage(context, granted ? '알림 권한이 허용되어 있습니다.' : '알림 권한이 꺼져 있습니다. 휴대폰 설정에서 허용해 주세요.');
-                        }
-                      },
-                    ),
-                  ],
-                ),
+              const SectionHeader('알림 받기', padding: EdgeInsets.fromLTRB(Space.page, 8, Space.page, 4)),
+              SwitchListTile(
+                title: const Text('앱 이용 알림'),
+                subtitle: const Text('민감 서비스 이용 · 도움 필요'),
+                value: settings.activityAlerts,
+                onChanged: (v) => settings.activityAlerts = v,
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
-                child: Text(
-                  '현재 버전은 테스트용 데이터로 동작하며, 이 휴대폰 안에서 만든 알림만 표시됩니다. '
-                  '가족 휴대폰에서 보내는 실제 원격 알림은 서버 연동 후 지원됩니다.',
-                  style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
-                ),
+              divider,
+              SwitchListTile(
+                title: const Text('승인 요청 알림'),
+                subtitle: const Text('도우미 진행 승인 요청'),
+                value: settings.approvalAlerts,
+                onChanged: (v) => settings.approvalAlerts = v,
               ),
-              const SectionHeader('개인정보 보호'),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.privacy_tip_outlined),
-                  title: const Text('개인정보 보호 안내'),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => _showPrivacy(context),
-                ),
+              divider,
+              SwitchListTile(
+                title: const Text('SOS 알림'),
+                subtitle: const Text('SOS · 사기 의심 (끄지 않는 것을 권장)'),
+                value: settings.sosAlerts,
+                onChanged: (v) => settings.sosAlerts = v,
               ),
-              const SectionHeader('앱 정보'),
-              Card(
-                child: Column(
-                  children: [
-                    const ListTile(
-                      leading: SproutMark(size: 32),
-                      title: Text('해봄 가족'),
-                      subtitle: Text('오늘도, 스스로 해봄.'),
-                    ),
-                    const Divider(indent: 16, endIndent: 16),
-                    const ListTile(title: Text('서비스 버전'), trailing: Text(appVersion)),
-                    const Divider(indent: 16, endIndent: 16),
-                    ListTile(
-                      title: const Text('데이터 연결'),
-                      trailing: Text(deps.mockBackend != null ? '테스트 데이터' : '서버'),
-                    ),
-                    if (deps.push != null) ...[
-                      const Divider(indent: 16, endIndent: 16),
-                      _PushStatusTile(push: deps.push!),
-                    ],
-                    const Divider(indent: 16, endIndent: 16),
-                    ListTile(
-                      title: const Text('오픈소스 라이선스'),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => showLicensePage(
-                        context: context,
-                        applicationName: '해봄 가족',
-                        applicationVersion: appVersion,
-                      ),
-                    ),
-                  ],
+              const SectionHeader('잠금 화면'),
+              SwitchListTile(
+                title: const Text('알림에 상세 내용 표시'),
+                subtitle: const Text('끄면 "새 가족 알림이 도착했습니다"만 표시'),
+                value: settings.showDetailsInNotification,
+                onChanged: (v) => settings.showDetailsInNotification = v,
+              ),
+              divider,
+              ListTile(
+                title: const Text('기기 알림 권한 확인'),
+                subtitle: const Text('알림이 오지 않을 때 눌러 주세요'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () async {
+                  final granted = await deps.notifications.requestPermission();
+                  if (context.mounted) {
+                    showMessage(context, granted ? '알림 권한이 허용되어 있습니다.' : '알림 권한이 꺼져 있습니다. 휴대폰 설정에서 허용해 주세요.');
+                  }
+                },
+              ),
+              const SectionHeader('연결 상태'),
+              ListTile(
+                title: const Text('데이터 연결'),
+                trailing: Text(deps.mockBackend != null ? '테스트 데이터' : '서버'),
+              ),
+              if (deps.push != null) ...[
+                divider,
+                _PushStatusTile(push: deps.push!),
+              ],
+              const SectionHeader('정보'),
+              ListTile(
+                title: const Text('개인정보 보호 안내'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => _showPrivacy(context),
+              ),
+              divider,
+              const ListTile(
+                leading: BrandMark(size: 32),
+                title: Text('해봄 가족'),
+                subtitle: Text('오늘도, 스스로 해봄.'),
+                trailing: Text(appVersion),
+              ),
+              divider,
+              ListTile(
+                title: const Text('오픈소스 라이선스'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => showLicensePage(
+                  context: context,
+                  applicationName: '해봄 가족',
+                  applicationVersion: appVersion,
                 ),
               ),
               if (AppRoutes.developerEnabled && deps.mockBackend != null) ...[
                 const SectionHeader('개발자'),
-                Card(
-                  child: ListTile(
-                    key: const Key('developer_entry'),
-                    leading: const Icon(Icons.science_outlined),
-                    title: const Text('개발자 테스트 모드'),
-                    subtitle: const Text('디버그 빌드에서만 표시됩니다'),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () => Navigator.pushNamed(context, AppRoutes.developer),
-                  ),
+                ListTile(
+                  key: const Key('developer_entry'),
+                  title: const Text('개발자 테스트 모드'),
+                  subtitle: const Text('디버그 빌드에서만 표시'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.pushNamed(context, AppRoutes.developer),
                 ),
               ],
             ],

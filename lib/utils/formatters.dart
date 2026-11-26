@@ -45,6 +45,15 @@ String formatDateTime(DateTime t, DateTime now) {
   return '${t.year}년 ${t.month}월 ${t.day}일 ${formatClock(t)}';
 }
 
+/// 목록의 날짜 묶음 제목: 오늘 / 어제 / 11월 24일 (화) / 2025년 3월 1일 (토)
+String formatDayHeader(DateTime t, DateTime now) {
+  if (isSameDay(t, now)) return '오늘';
+  if (isSameDay(t, now.subtract(const Duration(days: 1)))) return '어제';
+  const w = ['월', '화', '수', '목', '금', '토', '일'];
+  final day = '${t.month}월 ${t.day}일 (${w[t.weekday - 1]})';
+  return t.year == now.year ? day : '${t.year}년 $day';
+}
+
 /// 방금 전 / 5분 전 / 2시간 전 / 어제 오후 3:12
 String formatAgo(DateTime t, DateTime now) {
   final d = now.difference(t);

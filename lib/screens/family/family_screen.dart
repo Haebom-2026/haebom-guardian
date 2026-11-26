@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/dependencies.dart';
 import '../../app/routes.dart';
+import '../../app/theme.dart';
 import '../../models/family_link.dart';
 import '../../repositories/guardian_repository.dart';
 import '../../utils/formatters.dart';
@@ -35,11 +36,6 @@ class FamilyScreen extends StatelessWidget {
     final t = Theme.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('가족')),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.pushNamed(context, AppRoutes.connectFamily),
-        icon: const Icon(Icons.person_add_alt_1_rounded),
-        label: const Text('가족 연결'),
-      ),
       body: SafeArea(
         top: false,
         child: ListenableBuilder(
@@ -47,53 +43,78 @@ class FamilyScreen extends StatelessWidget {
           builder: (context, _) {
             final links = store.links;
             return ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+              padding: const EdgeInsets.only(bottom: 32),
               children: [
-                Text('연결된 가족 ${links.length}명', style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 4),
-                Text('한 가족에게 여러 보호자가 함께 연결될 수 있습니다.',
-                    style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
-                const SizedBox(height: 12),
-                if (links.isEmpty)
-                  const Card(
-                    child: EmptyState(
-                      icon: Icons.people_outline_rounded,
-                      title: '연결된 가족이 없습니다',
-                      message: '가족의 해봄 앱 → 가족 연결에서 6자리 코드를 받아 입력해 주세요.',
-                    ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(Space.page, 0, Space.page, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('연결된 가족 ${links.length}명', style: t.textTheme.titleLarge),
+                      const SizedBox(height: 2),
+                      Text('한 가족에게 여러 보호자가 함께 연결될 수 있습니다.', style: t.textTheme.bodySmall),
+                    ],
                   ),
-                for (final l in links)
+                ),
+                if (links.isEmpty)
+                  const EmptyState(
+                    icon: Icons.people_outline_rounded,
+                    title: '연결된 가족이 없습니다',
+                    message: '가족의 해봄 앱 → 가족 연결에서 6자리 코드를 받아 입력해 주세요.',
+                  ),
+                for (final (i, l) in links.indexed) ...[
+                  if (i > 0) const Divider(indent: Space.page + 56, endIndent: Space.page),
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-                        child: Row(
-                          children: [
-                            FamilyAvatar(l.displayName),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                    padding: const EdgeInsets.fromLTRB(Space.page, 12, Space.page - 8, 12),
+                    child: Row(
+                      children: [
+                        FamilyAvatar(avatarText(l.elderName, fallback: l.displayName), radius: 22),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(l.displayName, style: t.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w800)),
+                              Text(
+                                '${l.elderName} · ${formatDateTime(l.connectedAt, store.now())} 연결',
+                                style: t.textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                        // 연결 해제는 되돌리기 어려워 바로 보이는 버튼 대신 메뉴 안에 둔다 (확인 창 유지)
+                        PopupMenuButton<String>(
+                          tooltip: '${l.displayName} 메뉴',
+                          icon: const Icon(Icons.more_vert_rounded),
+                          onSelected: (v) {
+                            if (v == 'disconnect') _disconnect(context, l);
+                          },
+                          itemBuilder: (context) => [
+                            PopupMenuItem(
+                              value: 'disconnect',
+                              child: Row(
                                 children: [
-                                  Text(l.displayName,
-                                      style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                                  Text(l.elderName, style: t.textTheme.bodyMedium),
-                                  Text('${formatDateTime(l.connectedAt, store.now())} 연결',
-                                      style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
+                                  Icon(Icons.link_off_rounded, color: Theme.of(context).colorScheme.error),
+                                  const SizedBox(width: 10),
+                                  Text('연결 해제', style: TextStyle(color: Theme.of(context).colorScheme.error)),
                                 ],
                               ),
                             ),
-                            IconButton(
-                              tooltip: '${l.displayName} 연결 해제',
-                              icon: const Icon(Icons.link_off_rounded),
-                              onPressed: () => _disconnect(context, l),
-                            ),
                           ],
                         ),
-                      ),
+                      ],
                     ),
                   ),
+                ],
+                const SizedBox(height: Space.section),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: Space.page),
+                  child: FilledButton.icon(
+                    onPressed: () => Navigator.pushNamed(context, AppRoutes.connectFamily),
+                    icon: const Icon(Icons.person_add_alt_1_rounded),
+                    label: const Text('가족 연결'),
+                  ),
+                ),
               ],
             );
           },

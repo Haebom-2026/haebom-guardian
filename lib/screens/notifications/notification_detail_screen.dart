@@ -83,7 +83,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
               final confirmedAt = n.readBy[store.guardianId];
               final accent = RiskStyle.color(n.risk, t);
               return ListView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(Space.page),
                 children: [
                   Card(
                     child: Padding(

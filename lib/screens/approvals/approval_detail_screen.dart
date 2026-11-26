@@ -6,6 +6,7 @@ import '../../models/approval_request.dart';
 import '../../models/sensitivity.dart';
 import '../../repositories/guardian_repository.dart';
 import '../../utils/formatters.dart';
+import '../../widgets/approval_actions.dart';
 import '../../widgets/common.dart';
 
 class ApprovalDetailScreen extends StatefulWidget {
@@ -28,33 +29,9 @@ class _ApprovalDetailScreenState extends State<ApprovalDetailScreen> {
 
   Future<void> _respond(ApprovalRequest a, bool approve) async {
     if (_submitting) return; // 중복 탭 방지
-    final deps = AppScope.of(context);
-    final who = deps.store.nameOf(a.elderId);
-    final ok = await confirmDialog(
-      context,
-      title: approve ? '도우미 안내를 계속해도 될까요?' : '도우미 안내를 잠깐 멈출까요?',
-      message: approve
-          ? '$who의 해봄 도우미가 \'${ApprovalActions.label(a.action)}\'을(를) 계속합니다.\n'
-              '실제 금융 거래나 본인인증을 대신 승인하는 것은 아닙니다.'
-          : '$who의 해봄 도우미가 안내를 멈추고 "가족이 잠깐 멈추자고 했어요"라고 알려 드립니다.\n'
-              '필요하면 직접 전화해 상황을 확인해 주세요.',
-      confirmLabel: approve ? '계속해도 돼요' : '잠깐 멈춰요',
-      destructive: !approve,
-    );
-    if (!ok || !mounted) return;
-    setState(() => _submitting = true);
-    try {
-      await deps.repository.respondToApproval(a.id, approve: approve);
-      if (!mounted) return;
-      showMessage(context,
-          approve ? '"계속해도 돼요"를 보냈습니다. 가족의 해봄 앱에 바로 전달됩니다.' : '"잠깐 멈춰요"를 보냈습니다. 가족의 해봄 앱에 바로 전달됩니다.');
-    } on RepositoryException catch (e) {
-      if (mounted) showMessage(context, e.userMessage);
-    } catch (_) {
-      if (mounted) showMessage(context, '처리하지 못했습니다. 네트워크 연결을 확인해 주세요.');
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
+    await respondWithConfirm(context, a, approve: approve, onBusy: (busy) {
+      if (mounted) setState(() => _submitting = busy);
+    });
   }
 
   @override
@@ -104,7 +81,7 @@ class _ApprovalDetailScreenState extends State<ApprovalDetailScreen> {
     final pending = status == ApprovalStatus.pending;
     final style = StatusStyle.of(status, t.brightness);
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(Space.page),
       children: [
         Card(
           child: Padding(

@@ -47,155 +47,183 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(width: 8),
         ],
       ),
-      body: SafeArea(
-        top: false,
-        child: ListenableBuilder(
-          listenable: store,
-          builder: (context, _) {
-            if (!store.isLoaded) {
-              // 서버가 읽기를 거부하거나 연결이 안 되면 무한 로딩 대신 안내한다
-              final e = store.lastError;
-              if (e != null) {
-                return ListView(children: [
-                  EmptyState(
-                    icon: Icons.cloud_off_rounded,
-                    title: '가족 정보를 불러오지 못했습니다',
-                    message: e is RepositoryException && e.code == RepositoryErrorCode.permissionDenied
-                        ? '서버에서 아직 이 계정의 접근을 허용하지 않았습니다. 서버 준비가 끝나면 자동으로 다시 불러옵니다.'
-                        : '네트워크 연결을 확인해 주세요.',
-                  ),
-                ]);
+      body: RefreshIndicator(
+        // 아래로 당기면 서버에서 다시 조회 (서버 모드). Mock은 실시간이라 바로 끝난다
+        onRefresh: store.refresh,
+        child: SafeArea(
+          top: false,
+          child: ListenableBuilder(
+            listenable: store,
+            builder: (context, _) {
+              if (!store.isLoaded) {
+                // 서버가 읽기를 거부하거나 연결이 안 되면 무한 로딩 대신 안내한다
+                final e = store.lastError;
+                if (e != null) {
+                  return ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      EmptyState(
+                        icon: Icons.cloud_off_rounded,
+                        title: '가족 정보를 불러오지 못했습니다',
+                        message: e is RepositoryException && e.code == RepositoryErrorCode.permissionDenied
+                            ? '서버에서 아직 이 계정의 접근을 허용하지 않았습니다. 서버 준비가 끝나면 자동으로 다시 불러옵니다.'
+                            : '네트워크 연결을 확인해 주세요.',
+                      ),
+                    ],
+                  );
+                }
+                return const Center(child: CircularProgressIndicator());
               }
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (store.links.isEmpty) return const _NoFamily();
+              if (store.links.isEmpty) return const _NoFamily();
 
-            final elder = store.selectedElderId;
-            void openNotification(String id) => Navigator.pushNamed(context, AppRoutes.notificationDetail, arguments: id);
-            void openApproval(String id) => Navigator.pushNamed(context, AppRoutes.approvalDetail, arguments: id);
+              final elder = store.selectedElderId;
+              void openNotification(String id) =>
+                  Navigator.pushNamed(context, AppRoutes.notificationDetail, arguments: id);
+              void openApproval(String id) => Navigator.pushNamed(context, AppRoutes.approvalDetail, arguments: id);
 
-            // ── 데이터 나누기 (중복 없음)
-            final unread = store.notificationsFor(elderId: elder, unreadOnly: true);
-            final sos = unread.where((n) => n.risk == RiskTone.danger).toList();
-            final stuck = unread.where((n) => n.risk == RiskTone.caution).toList();
-            final pending = store.approvalsFor(elderId: elder, status: ApprovalStatus.pending);
-            final unreadNormal = unread.where((n) => n.risk == RiskTone.normal).toList();
-            final now = store.now();
-            final recent = <_News>[
-              for (final n in store.notificationsFor(elderId: elder).where((n) => !store.isUnread(n))) _News.notification(n),
-              for (final a in store.approvalsFor(elderId: elder).where((a) => a.effectiveStatus(now) != ApprovalStatus.pending))
-                _News.approval(a),
-            ]..sort((a, b) => b.at.compareTo(a.at));
-            final helpCount = sos.length + stuck.length + pending.length;
-            final todayCount = store.notificationsFor(elderId: elder).where((n) => isSameDay(n.createdAt, now)).length;
+              // ── 데이터 나누기 (중복 없음)
+              final unread = store.notificationsFor(elderId: elder, unreadOnly: true);
+              final sos = unread.where((n) => n.risk == RiskTone.danger).toList();
+              final stuck = unread.where((n) => n.risk == RiskTone.caution).toList();
+              final pending = store.approvalsFor(elderId: elder, status: ApprovalStatus.pending);
+              final unreadNormal = unread.where((n) => n.risk == RiskTone.normal).toList();
+              final now = store.now();
+              final recent = <_News>[
+                for (final n in store.notificationsFor(elderId: elder).where((n) => !store.isUnread(n)))
+                  _News.notification(n),
+                for (final a
+                    in store
+                        .approvalsFor(elderId: elder)
+                        .where((a) => a.effectiveStatus(now) != ApprovalStatus.pending))
+                  _News.approval(a),
+              ]..sort((a, b) => b.at.compareTo(a.at));
+              final helpCount = sos.length + stuck.length + pending.length;
+              final todayCount = store
+                  .notificationsFor(elderId: elder)
+                  .where((n) => isSameDay(n.createdAt, now))
+                  .length;
 
-            return ListView(
-              padding: const EdgeInsets.only(bottom: 32),
-              children: [
-                // 첫 문구: 지금 확인할 일이 몇 건인지 (햇살 그림은 장식)
-                _HomeHero(count: helpCount + unreadNormal.length, now: now),
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: 32),
+                children: [
+                  // 첫 문구: 지금 확인할 일이 몇 건인지 (햇살 그림은 장식)
+                  _HomeHero(count: helpCount + unreadNormal.length, now: now),
 
-                // ① 누구의 정보인지
-                _FamilyHeader(store: store),
-                if (store.links.length >= 2) ...[
-                  const SizedBox(height: 12),
-                  FamilyFilterBar(store: store),
-                ],
-                const SizedBox(height: Space.gap),
-                _SummaryTiles(
-                  today: todayCount,
-                  unread: unread.length,
-                  pending: pending.length,
-                  onNotifications: () => deps.tabIndex.value = 1,
-                  onApprovals: () => deps.tabIndex.value = 2,
-                ),
+                  // ① 누구의 정보인지
+                  _FamilyHeader(store: store),
+                  if (store.links.length >= 2) ...[const SizedBox(height: 12), FamilyFilterBar(store: store)],
+                  const SizedBox(height: Space.gap),
+                  _SummaryTiles(
+                    today: todayCount,
+                    unread: unread.length,
+                    pending: pending.length,
+                    onNotifications: () => deps.tabIndex.value = 1,
+                    onApprovals: () => deps.tabIndex.value = 2,
+                  ),
 
-                // ② 도움이 필요한 일: SOS → 도움 필요 → 승인 대기
-                SectionHeader('도움이 필요한 일', count: helpCount == 0 ? null : helpCount, countKey: const ValueKey('help_count')),
-                if (helpCount == 0)
-                  const _NothingToCheck()
-                else
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: Space.page - 4),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                  // ② 도움이 필요한 일: SOS → 도움 필요 → 승인 대기
+                  SectionHeader(
+                    '도움이 필요한 일',
+                    count: helpCount == 0 ? null : helpCount,
+                    countKey: const ValueKey('help_count'),
+                  ),
+                  if (helpCount == 0)
+                    const _NothingToCheck()
+                  else
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: Space.page - 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (final n in [...sos, ...stuck])
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: Space.gap),
+                              child: _notificationHelp(context, store, n, () => openNotification(n.id)),
+                            ),
+                          for (final a in pending)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: Space.gap),
+                              child: _approvalHelp(context, store, a, () => openApproval(a.id)),
+                            ),
+                        ],
+                      ),
+                    ),
+
+                  // ③ 확인하지 않은 알림 (도움이 필요한 일에 나온 것은 제외)
+                  SectionHeader(
+                    '확인하지 않은 알림',
+                    count: unreadNormal.length,
+                    countKey: const ValueKey('unread_count'),
+                    actionLabel: '알림 보기',
+                    onAction: () => deps.tabIndex.value = 1,
+                  ),
+                  if (unreadNormal.isEmpty)
+                    const _Quiet('확인하지 않은 알림이 없어요.')
+                  else
+                    CardGroup(
                       children: [
-                        for (final n in [...sos, ...stuck])
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: Space.gap),
-                            child: _notificationHelp(context, store, n, () => openNotification(n.id)),
+                        for (final (i, n) in unreadNormal.take(_unreadLimit).indexed) ...[
+                          if (i > 0) const RowDivider(),
+                          NotificationTile(item: n, store: store, onTap: () => openNotification(n.id)),
+                        ],
+                      ],
+                    ),
+                  if (unreadNormal.length > _unreadLimit)
+                    _MoreLink('확인하지 않은 알림 ${unreadNormal.length - _unreadLimit}건 더 보기', () => deps.tabIndex.value = 1),
+
+                  // ④ 최근 소식 (확인한 알림·처리된 승인, 최대 3건)
+                  const SectionHeader('최근 소식'),
+                  if (recent.isEmpty)
+                    const _Quiet('최근 소식이 없어요.')
+                  else
+                    CardGroup(
+                      children: [
+                        for (final (i, item) in recent.take(_recentLimit).indexed) ...[
+                          if (i > 0) const RowDivider(),
+                          item.notification != null
+                              ? NotificationTile(
+                                  item: item.notification!,
+                                  store: store,
+                                  onTap: () => openNotification(item.notification!.id),
+                                )
+                              : ApprovalCard(
+                                  request: item.approval!,
+                                  store: store,
+                                  onTap: () => openApproval(item.approval!.id),
+                                ),
+                        ],
+                      ],
+                    ),
+                  const SizedBox(height: Space.section),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: Space.page),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            key: const Key('home_all_notifications'),
+                            onPressed: () => deps.tabIndex.value = 1,
+                            child: const Text('알림 기록'),
                           ),
-                        for (final a in pending)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: Space.gap),
-                            child: _approvalHelp(context, store, a, () => openApproval(a.id)),
+                        ),
+                        const SizedBox(width: Space.gap),
+                        Expanded(
+                          child: OutlinedButton(
+                            key: const Key('home_all_approvals'),
+                            onPressed: () => deps.tabIndex.value = 2,
+                            child: const Text('승인 기록'),
                           ),
+                        ),
                       ],
                     ),
                   ),
-
-                // ③ 확인하지 않은 알림 (도움이 필요한 일에 나온 것은 제외)
-                SectionHeader(
-                  '확인하지 않은 알림',
-                  count: unreadNormal.length,
-                  countKey: const ValueKey('unread_count'),
-                  actionLabel: '알림 보기',
-                  onAction: () => deps.tabIndex.value = 1,
-                ),
-                if (unreadNormal.isEmpty)
-                  const _Quiet('확인하지 않은 알림이 없어요.')
-                else
-                  CardGroup(children: [
-                    for (final (i, n) in unreadNormal.take(_unreadLimit).indexed) ...[
-                      if (i > 0) const RowDivider(),
-                      NotificationTile(item: n, store: store, onTap: () => openNotification(n.id)),
-                    ],
-                  ]),
-                if (unreadNormal.length > _unreadLimit)
-                  _MoreLink('확인하지 않은 알림 ${unreadNormal.length - _unreadLimit}건 더 보기', () => deps.tabIndex.value = 1),
-
-                // ④ 최근 소식 (확인한 알림·처리된 승인, 최대 3건)
-                const SectionHeader('최근 소식'),
-                if (recent.isEmpty)
-                  const _Quiet('최근 소식이 없어요.')
-                else
-                  CardGroup(children: [
-                    for (final (i, item) in recent.take(_recentLimit).indexed) ...[
-                      if (i > 0) const RowDivider(),
-                      item.notification != null
-                          ? NotificationTile(
-                              item: item.notification!, store: store, onTap: () => openNotification(item.notification!.id))
-                          : ApprovalCard(request: item.approval!, store: store, onTap: () => openApproval(item.approval!.id)),
-                    ],
-                  ]),
-                const SizedBox(height: Space.section),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: Space.page),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          key: const Key('home_all_notifications'),
-                          onPressed: () => deps.tabIndex.value = 1,
-                          child: const Text('알림 기록'),
-                        ),
-                      ),
-                      const SizedBox(width: Space.gap),
-                      Expanded(
-                        child: OutlinedButton(
-                          key: const Key('home_all_approvals'),
-                          onPressed: () => deps.tabIndex.value = 2,
-                          child: const Text('승인 기록'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: Space.section),
-                const _PrivacyNote(),
-              ],
-            );
-          },
+                  const SizedBox(height: Space.section),
+                  const _PrivacyNote(),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -239,12 +267,8 @@ class HomeScreen extends StatelessWidget {
 
 /// 최근 소식 한 건 (알림 또는 처리된 승인)
 class _News {
-  _News.notification(NotificationItem this.notification)
-      : approval = null,
-        at = notification.createdAt;
-  _News.approval(ApprovalRequest this.approval)
-      : notification = null,
-        at = approval.respondedAt ?? approval.createdAt;
+  _News.notification(NotificationItem this.notification) : approval = null, at = notification.createdAt;
+  _News.approval(ApprovalRequest this.approval) : notification = null, at = approval.respondedAt ?? approval.createdAt;
   final NotificationItem? notification;
   final ApprovalRequest? approval;
   final DateTime at;
@@ -282,11 +306,16 @@ class _HomeHero extends StatelessWidget {
                   child: count == 0
                       ? Text('지금은 확인할\n일이 없어요', style: headline)
                       : Text.rich(
-                          TextSpan(children: [
-                            const TextSpan(text: '확인할 일이\n'),
-                            TextSpan(text: '$count건', style: TextStyle(color: k.primary)),
-                            const TextSpan(text: ' 있어요'),
-                          ]),
+                          TextSpan(
+                            children: [
+                              const TextSpan(text: '확인할 일이\n'),
+                              TextSpan(
+                                text: '$count건',
+                                style: TextStyle(color: k.primary),
+                              ),
+                              const TextSpan(text: ' 있어요'),
+                            ],
+                          ),
                           style: headline,
                         ),
                 ),
@@ -306,11 +335,11 @@ class _Sun extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ExcludeSemantics(
-        child: Opacity(
-          opacity: Theme.of(context).brightness == Brightness.dark ? 0.35 : 1,
-          child: CustomPaint(size: Size.square(size), painter: _SunPainter()),
-        ),
-      );
+    child: Opacity(
+      opacity: Theme.of(context).brightness == Brightness.dark ? 0.35 : 1,
+      child: CustomPaint(size: Size.square(size), painter: _SunPainter()),
+    ),
+  );
 }
 
 class _SunPainter extends CustomPainter {
@@ -550,9 +579,9 @@ class _Quiet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: Space.page, vertical: 8),
-        child: Text(text, style: Theme.of(context).textTheme.bodySmall),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: Space.page, vertical: 8),
+    child: Text(text, style: Theme.of(context).textTheme.bodySmall),
+  );
 }
 
 class _MoreLink extends StatelessWidget {
@@ -562,9 +591,12 @@ class _MoreLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: Space.page - 8),
-        child: Align(alignment: Alignment.centerLeft, child: TextButton(onPressed: onTap, child: Text('$label 〉'))),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: Space.page - 8),
+    child: Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton(onPressed: onTap, child: Text('$label 〉')),
+    ),
+  );
 }
 
 class _PrivacyNote extends StatelessWidget {
@@ -572,13 +604,13 @@ class _PrivacyNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: Space.page),
-        child: Text(
-          '가족이 직접 동의한 알림과 요청만 표시됩니다. 위치나 실시간 접속 상태는 수집하지 않습니다.',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: Space.page),
+    child: Text(
+      '가족이 직접 동의한 알림과 요청만 표시됩니다. 위치나 실시간 접속 상태는 수집하지 않습니다.',
+      textAlign: TextAlign.center,
+      style: Theme.of(context).textTheme.bodySmall,
+    ),
+  );
 }
 
 /// 연결된 가족이 없을 때
@@ -589,6 +621,7 @@ class _NoFamily extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(Space.page),
       children: [
         const SizedBox(height: 24),

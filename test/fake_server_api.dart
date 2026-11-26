@@ -22,6 +22,23 @@ class FakeServerApi implements GuardianServerApi {
     return List.of(links);
   }
 
+  /// [fetchNotifications]가 돌려줄 #21 항목 (서버 모양)
+  List<Map<String, Object?>> notifications = [];
+
+  @override
+  Future<NotificationPage> fetchNotifications({int limit = 50, String? cursor, String? since}) async {
+    _call('notifications');
+    return NotificationPage(items: List.of(notifications), serverTime: '2026-11-26T10:00:00.000Z');
+  }
+
+  @override
+  Future<void> markNotificationRead(String notificationId) async {
+    _call('read:$notificationId');
+    for (final n in notifications) {
+      if (n['id'] == notificationId) n['readAt'] ??= '2026-11-26T10:00:00.000Z';
+    }
+  }
+
   @override
   Future<void> ensureGuardianProfile({String? name}) async => _call('profile');
   @override

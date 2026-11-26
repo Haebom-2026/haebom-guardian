@@ -87,4 +87,7 @@ abstract class GuardianRepository {
 
   /// 가족 연결 해제
   Future<void> disconnect(String elderId);
+
+  /// 화면을 당겨 새로고침할 때: 서버에서 가족·알림·승인을 다시 조회한다 (실시간 구독 저장소는 할 일 없음)
+  Future<void> refresh();
 }

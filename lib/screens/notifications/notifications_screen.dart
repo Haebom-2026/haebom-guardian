@@ -41,10 +41,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               onPressed: store.unreadCount(elderId: store.selectedElderId) == 0
                   ? null
                   : () async {
-                      final ok = await confirmDialog(context,
-                          title: '모두 확인',
-                          message: '확인 전 알림을 모두 확인 처리할까요?\n가족의 해봄 앱에 "확인했어요"로 표시될 수 있습니다.',
-                          confirmLabel: '모두 확인');
+                      final ok = await confirmDialog(
+                        context,
+                        title: '모두 확인',
+                        message: '확인 전 알림을 모두 확인 처리할까요?\n가족의 해봄 앱에 "확인했어요"로 표시될 수 있습니다.',
+                        confirmLabel: '모두 확인',
+                      );
                       if (ok) await store.repository.markAllNotificationsRead(elderId: store.selectedElderId);
                     },
               child: const Text('모두 확인'),
@@ -53,75 +55,92 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           const SizedBox(width: 12),
         ],
       ),
-      body: SafeArea(
-        top: false,
-        child: ListenableBuilder(
-          listenable: store,
-          builder: (context, _) {
-            final items = store.notificationsFor(elderId: store.selectedElderId, unreadOnly: _unreadOnly);
-            final now = store.now();
-            // 날짜별 묶음 (목록은 이미 최신순): 날짜 제목 + 흰 카드 한 장
-            final groups = <(String, List<NotificationItem>)>[];
-            for (final n in items) {
-              final d = formatDayHeader(n.createdAt, now);
-              if (groups.isEmpty || groups.last.$1 != d) groups.add((d, []));
-              groups.last.$2.add(n);
-            }
-            final rows = <Widget>[
-              for (final (d, list) in groups) ...[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(Space.page, Space.section - 8, Space.page, 8),
-                  child: Semantics(
-                    header: true,
-                    child: Text(d, style: t.textTheme.bodyMedium?.copyWith(color: k.textSub, fontWeight: FontWeight.w700)),
-                  ),
-                ),
-                CardGroup(children: [
-                  for (final (i, n) in list.indexed) ...[
-                    if (i > 0) const RowDivider(),
-                    _tile(context, n),
-                  ],
-                ]),
-              ],
-            ];
-            return Column(
-              children: [
-                const SizedBox(height: 4),
-                // 상태(전체·확인 전)와 가족 필터를 한 줄에
-                FamilyFilterBar(
-                  store: store,
-                  leading: [
-                    FilterPill(label: '전체', selected: !_unreadOnly, onSelected: () => setState(() => _unreadOnly = false)),
-                    FilterPill(
-                      label: '확인 전 ${store.unreadCount(elderId: store.selectedElderId)}',
-                      selected: _unreadOnly,
-                      onSelected: () => setState(() => _unreadOnly = true),
+      body: RefreshIndicator(
+        // 아래로 당기면 서버에서 다시 조회 (서버 모드). Mock은 실시간이라 바로 끝난다
+        onRefresh: store.refresh,
+        child: SafeArea(
+          top: false,
+          child: ListenableBuilder(
+            listenable: store,
+            builder: (context, _) {
+              final items = store.notificationsFor(elderId: store.selectedElderId, unreadOnly: _unreadOnly);
+              final now = store.now();
+              // 날짜별 묶음 (목록은 이미 최신순): 날짜 제목 + 흰 카드 한 장
+              final groups = <(String, List<NotificationItem>)>[];
+              for (final n in items) {
+                final d = formatDayHeader(n.createdAt, now);
+                if (groups.isEmpty || groups.last.$1 != d) groups.add((d, []));
+                groups.last.$2.add(n);
+              }
+              final rows = <Widget>[
+                for (final (d, list) in groups) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(Space.page, Space.section - 8, Space.page, 8),
+                    child: Semantics(
+                      header: true,
+                      child: Text(
+                        d,
+                        style: t.textTheme.bodyMedium?.copyWith(color: k.textSub, fontWeight: FontWeight.w700),
+                      ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Expanded(
-                  child: items.isEmpty
-                      ? ListView(children: [
-                          EmptyState(
-                            icon: Icons.notifications_none_rounded,
-                            title: _unreadOnly ? '확인 전 알림이 없습니다' : '알림이 없습니다',
-                            message: '가족이 민감한 서비스 이용 알림에 동의하면 이곳에 표시됩니다.',
+                  ),
+                  CardGroup(
+                    children: [
+                      for (final (i, n) in list.indexed) ...[if (i > 0) const RowDivider(), _tile(context, n)],
+                    ],
+                  ),
+                ],
+              ];
+              return Column(
+                children: [
+                  const SizedBox(height: 4),
+                  // 상태(전체·확인 전)와 가족 필터를 한 줄에
+                  FamilyFilterBar(
+                    store: store,
+                    leading: [
+                      FilterPill(
+                        label: '전체',
+                        selected: !_unreadOnly,
+                        onSelected: () => setState(() => _unreadOnly = false),
+                      ),
+                      FilterPill(
+                        label: '확인 전 ${store.unreadCount(elderId: store.selectedElderId)}',
+                        selected: _unreadOnly,
+                        onSelected: () => setState(() => _unreadOnly = true),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Expanded(
+                    child: items.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            children: [
+                              EmptyState(
+                                icon: Icons.notifications_none_rounded,
+                                title: _unreadOnly ? '확인 전 알림이 없습니다' : '알림이 없습니다',
+                                message: '가족이 민감한 서비스 이용 알림에 동의하면 이곳에 표시됩니다.',
+                              ),
+                            ],
+                          )
+                        : ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.only(bottom: 32),
+                            children: rows,
                           ),
-                        ])
-                      : ListView(padding: const EdgeInsets.only(bottom: 32), children: rows),
-                ),
-              ],
-            );
-          },
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
   }
 
   Widget _tile(BuildContext context, NotificationItem n) => NotificationTile(
-        item: n,
-        store: AppScope.of(context).store,
-        onTap: () => Navigator.pushNamed(context, AppRoutes.notificationDetail, arguments: n.id),
-      );
+    item: n,
+    store: AppScope.of(context).store,
+    onTap: () => Navigator.pushNamed(context, AppRoutes.notificationDetail, arguments: n.id),
+  );
 }

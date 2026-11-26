@@ -71,6 +71,9 @@ class GuardianStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 화면을 당겨 새로고침: 서버에서 다시 조회 (결과는 스트림으로 반영)
+  Future<void> refresh() => repository.refresh();
+
   String get guardianId => repository.currentGuardianId;
   DateTime now() => repository.now();
 

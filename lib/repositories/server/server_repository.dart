@@ -17,7 +17,8 @@ import 'resilient_stream.dart';
 /// **서버 API 방식** ([ServerGuardianRepository.api] 생성자, 실제 운영 — AWS 서버):
 /// - 가족 목록: 서버 #20 조회 ([ApiLinkFeed]). FCM `kind: link`·앱 복귀·주기 조회로 갱신
 /// - 연결·해제·기기 등록: 서버 API
-/// - 알림·승인: 서버 S2·S3 API가 아직 없어 빈 목록 (API가 나오면 이곳에 연결)
+/// - 알림: 서버 #21 조회 ([notificationFeed]), [확인했어요]는 #22. FCM `kind: notification`·앱 복귀·주기 조회로 갱신
+/// - 승인: 서버 S3 API가 아직 없어 빈 목록 (API가 나오면 이곳에 연결)
 ///
 /// **Firestore 방식** (기본 생성자, 로컬 Firebase 에뮬레이터 검증용):
 /// - **읽기**: Firestore 실시간 구독 (links → 연결된 가족별 notifications / approvals)
@@ -51,7 +52,41 @@ class ServerGuardianRepository implements GuardianRepository {
   })  : firestore = null,
         _clock = clock ?? DateTime.now,
         reconnectDelay = defaultReconnectDelay,
-        _snapshots = ((q) => q.snapshots());
+        _snapshots = ((q) => q.snapshots()) {
+    notificationFeed = ApiFeed<NotificationItem>(_fetchAllNotifications, compare: (a, b) => b.createdAt.compareTo(a.createdAt));
+  }
+
+  /// 서버 API 방식의 알림함 (Firestore 방식이면 null)
+  ApiFeed<NotificationItem>? notificationFeed;
+
+  /// 한 번에 가져올 최대 쪽수 (50개 × 4 = 최근 200개). 알림은 서버에 90일만 보관된다.
+  static const _maxNotificationPages = 4;
+
+  Future<List<NotificationItem>> _fetchAllNotifications() async {
+    final out = <NotificationItem>[];
+    String? cursor;
+    for (var page = 0; page < _maxNotificationPages; page++) {
+      final p = await api.fetchNotifications(limit: 50, cursor: cursor);
+      out.addAll(p.items.map(notificationFromApi));
+      cursor = p.nextCursor;
+      if (cursor == null) break;
+    }
+    return out;
+  }
+
+  /// #21 항목 → 모델. 받는 사람은 나 하나, `readAt`은 내 확인 시각
+  NotificationItem notificationFromApi(Map<String, Object?> j) {
+    final readAt = j['readAt'];
+    return FirestoreMappers.notification(
+      j['id'] as String? ?? '',
+      {
+        ...j,
+        'guardianIds': [guardianId],
+        'readBy': {if (readAt is String && readAt.isNotEmpty) guardianId: readAt},
+      },
+      _clock,
+    );
+  }
 
   /// Firestore 방식에서만 사용 (서버 API 방식이면 null)
   final FirebaseFirestore? firestore;
@@ -109,14 +144,14 @@ class ServerGuardianRepository implements GuardianRepository {
         return list;
       }).handleError(_rethrowMapped);
 
-  /// 서버 API 방식: 알림·승인 조회 API(S2·S3)가 아직 없어 빈 목록
   @override
-  Stream<List<NotificationItem>> watchNotifications() => _apiMode ? Stream.value(const []) : _perElder(
+  Stream<List<NotificationItem>> watchNotifications() => _apiMode ? notificationFeed!.stream : _perElder(
         _notifications,
         (id, data) => FirestoreMappers.notification(id, data, _clock),
         (a, b) => b.createdAt.compareTo(a.createdAt),
       );
 
+  /// 서버 API 방식: 승인 조회 API(S3)가 아직 없어 빈 목록
   @override
   Stream<List<ApprovalRequest>> watchApprovals() => _apiMode ? Stream.value(const []) : _perElder(
         _approvals,
@@ -196,7 +231,7 @@ class ServerGuardianRepository implements GuardianRepository {
 
   @override
   Future<NotificationItem> getNotification(String id) async {
-    if (_apiMode) throw const RepositoryException(RepositoryErrorCode.notFound, '알림 조회 API(S2) 준비 중');
+    if (_apiMode) return _findNotification(id);
     final doc = await _get(_notifications.doc(id));
     final data = doc.data();
     if (!doc.exists || data == null) throw const RepositoryException(RepositoryErrorCode.notFound);
@@ -219,7 +254,14 @@ class ServerGuardianRepository implements GuardianRepository {
   /// "확인했어요": 자기 readBy 항목만 쓴다. 이미 확인한 알림은 다시 쓰지 않는다(처음 확인 시각 유지).
   @override
   Future<void> markNotificationRead(String id) async {
-    if (_apiMode) throw const RepositoryException(RepositoryErrorCode.unavailable, '알림 확인 API(S2) 준비 중');
+    if (_apiMode) {
+      final n = await _findNotification(id);
+      if (n.isReadBy(guardianId)) return;
+      await api.markNotificationRead(id);
+      _patchRead({id});
+      unawaited(notificationFeed!.refresh());
+      return;
+    }
     final n = await getNotification(id);
     if (n.isReadBy(guardianId)) return;
     try {
@@ -231,7 +273,26 @@ class ServerGuardianRepository implements GuardianRepository {
 
   @override
   Future<void> markAllNotificationsRead({String? elderId}) async {
-    if (_apiMode) return; // 서버 API 방식에는 아직 알림이 없다
+    if (_apiMode) {
+      final unread = (notificationFeed!.latest ?? const <NotificationItem>[])
+          .where((n) => !n.isReadBy(guardianId) && (elderId == null || n.elderId == elderId))
+          .map((n) => n.id)
+          .toList();
+      final done = <String>{};
+      for (final id in unread) {
+        try {
+          await api.markNotificationRead(id);
+          done.add(id);
+        } on RepositoryException catch (e) {
+          if (e.code == RepositoryErrorCode.notFound) continue; // 해제·보관 기간 지남
+          _patchRead(done);
+          rethrow;
+        }
+      }
+      _patchRead(done);
+      await notificationFeed!.refresh();
+      return;
+    }
     try {
       final links = await _myLinks().get();
       final elders = links.docs
@@ -282,7 +343,32 @@ class ServerGuardianRepository implements GuardianRepository {
   @override
   Future<void> disconnect(String elderId) async {
     await api.disconnect(elderId);
-    await linkFeed?.refresh();
+    await refresh();
+  }
+
+  /// 서버 API 방식: 가족·알림을 다시 조회 (Firestore 방식은 실시간이라 할 일 없음)
+  @override
+  Future<void> refresh() async {
+    if (!_apiMode) return;
+    await Future.wait([linkFeed!.refresh(), notificationFeed!.refresh()]);
+  }
+
+  /// 알림함에서 찾고, 없으면 한 번 다시 조회해서 찾는다 (FCM으로 막 도착한 알림을 연 경우)
+  Future<NotificationItem> _findNotification(String id) async {
+    NotificationItem? find() => notificationFeed!.latest?.where((n) => n.id == id).firstOrNull;
+    final found = find();
+    if (found != null) return found;
+    await notificationFeed!.refresh();
+    return find() ?? (throw const RepositoryException(RepositoryErrorCode.notFound));
+  }
+
+  /// 읽음 처리한 알림을 서버 응답을 기다리지 않고 화면에 바로 반영
+  void _patchRead(Set<String> ids) {
+    if (ids.isEmpty) return;
+    final at = _clock();
+    notificationFeed!.patch((list) => [
+          for (final n in list) ids.contains(n.id) && !n.isReadBy(guardianId) ? n.copyWith(readBy: {...n.readBy, guardianId: at}) : n,
+        ]);
   }
 
   static Never _rethrowMapped(Object e) => throw mapFirestoreError(e);

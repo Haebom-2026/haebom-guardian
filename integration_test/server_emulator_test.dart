@@ -59,6 +59,14 @@ class _EmulatorServerApi implements GuardianServerApi {
   @override
   Future<void> ensureGuardianProfile({String? name}) async {}
 
+  // 에뮬레이터 검증은 Firestore 방식이라 #21·#22는 쓰지 않는다
+  @override
+  Future<NotificationPage> fetchNotifications({int limit = 50, String? cursor, String? since}) async =>
+      const NotificationPage(items: []);
+
+  @override
+  Future<void> markNotificationRead(String notificationId) async {}
+
   @override
   Future<List<FamilyLink>> fetchLinks() async {
     final snap = await db.collection('links').where('guardianId', isEqualTo: me).get();

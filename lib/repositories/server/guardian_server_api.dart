@@ -14,6 +14,12 @@ abstract class GuardianServerApi {
   /// #20 연결된 어르신 목록 (연결 시각 순). 응답에는 guardianId가 없으므로 빈 문자열로 둔다.
   Future<List<FamilyLink>> fetchLinks();
 
+  /// #21 내 알림함 한 페이지 (최신순). S2 계약서 3장
+  Future<NotificationPage> fetchNotifications({int limit = 50, String? cursor, String? since});
+
+  /// #22 알림 읽음 (이미 읽었으면 처음 시각 유지). 없는 알림은 not-found
+  Future<void> markNotificationRead(String notificationId);
+
   /// 보호자 프로필(users/{uid}, role=guardian)을 서버가 만들게 한다. 이미 있으면 그대로 둔다.
   Future<void> ensureGuardianProfile({String? name});
 
@@ -39,6 +45,8 @@ class ServerEndpoints {
   final String prefix;
 
   String profile() => '$prefix/users/me';
+  String notifications() => '$prefix/guardian/notifications';
+  String notificationRead(String id) => '$prefix/guardian/notifications/${Uri.encodeComponent(id)}/read';
   String respondApproval(String id) => '$prefix/guardian/approvals/${Uri.encodeComponent(id)}/respond';
   String links() => '$prefix/guardian/links';
   String link(String elderId) => '$prefix/guardian/links/${Uri.encodeComponent(elderId)}';
@@ -219,6 +227,26 @@ class HttpGuardianServerApi implements GuardianServerApi {
     ];
   }
 
+  @override
+  Future<NotificationPage> fetchNotifications({int limit = 50, String? cursor, String? since}) async {
+    final query = Uri(queryParameters: {
+      'limit': '$limit',
+      'cursor': ?cursor,
+      'since': ?since,
+    }).query;
+    final json = await _send('GET', '${endpoints.notifications()}?$query');
+    final raw = json['items'];
+    return NotificationPage(
+      items: raw is List ? raw.whereType<Map<String, Object?>>().toList() : const [],
+      nextCursor: json['nextCursor'] as String?,
+      serverTime: json['serverTime'] as String?,
+    );
+  }
+
+  @override
+  Future<void> markNotificationRead(String notificationId) =>
+      _send('POST', endpoints.notificationRead(notificationId));
+
   /// #14·#20 응답의 연결 한 건 → 모델
   static FamilyLink linkFromJson(Map<String, Object?> json, {String elderLabel = '', String guardianLabel = ''}) =>
       FamilyLink(
@@ -258,6 +286,14 @@ class HttpGuardianServerApi implements GuardianServerApi {
 
   @override
   Future<void> unregisterDevice(String deviceId) => _send('DELETE', endpoints.device(deviceId));
+}
+
+/// #21 응답 한 페이지. [items]는 서버 모양 그대로 (저장소가 보호자 uid를 넣어 모델로 바꾼다)
+class NotificationPage {
+  const NotificationPage({required this.items, this.nextCursor, this.serverTime});
+  final List<Map<String, Object?>> items;
+  final String? nextCursor;
+  final String? serverTime;
 }
 
 /// 재시도 판단용 HTTP 실패 (밖으로는 [exception]만 나간다)

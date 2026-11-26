@@ -70,4 +70,8 @@ class MockGuardianRepository implements GuardianRepository {
 
   @override
   Future<void> disconnect(String elderId) => _call(() => backend.disconnect(guardianId, elderId));
+
+  /// Mock은 실시간으로 반영되므로 할 일 없음
+  @override
+  Future<void> refresh() async {}
 }

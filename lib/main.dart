@@ -124,11 +124,12 @@ Future<void> _runWithServer(BackendConfig config) async {
     refreshIdToken: () async => FirebaseAuth.instance.currentUser?.getIdToken(true),
   );
   final linkFeed = firestore == null ? ApiLinkFeed(api.fetchLinks) : null;
+  final repository = linkFeed != null
+      ? ServerGuardianRepository.api(guardianId: user.uid, api: api, linkFeed: linkFeed)
+      : ServerGuardianRepository(firestore: firestore!, guardianId: user.uid, api: api);
 
   final deps = AppDependencies(
-    repository: linkFeed != null
-        ? ServerGuardianRepository.api(guardianId: user.uid, api: api, linkFeed: linkFeed)
-        : ServerGuardianRepository(firestore: firestore!, guardianId: user.uid, api: api),
+    repository: repository,
     notifier: PluginLocalNotifier(),
     settingsStorage: DeviceSettingsStorage(),
   );
@@ -148,6 +149,7 @@ Future<void> _runWithServer(BackendConfig config) async {
     deviceId: DeviceIdStore().get,
     onOpen: open,
     onLinkChanged: () => unawaited(linkFeed?.refresh()),
+    onContentChanged: () => unawaited(repository.notificationFeed?.refresh()),
   );
   deps.push = push;
   // 서버 규격상 기기 등록 전에 보호자 프로필이 필요하다. 서버가 꺼져 있어도 앱은 계속 동작하고,
@@ -156,22 +158,22 @@ Future<void> _runWithServer(BackendConfig config) async {
     register: api.ensureGuardianProfile,
     onRegistered: () async {
       await push.retry();
-      await linkFeed?.refresh();
+      await repository.refresh();
     },
   );
-  // 가족 목록: FCM은 빠질 수 있고 iPhone은 FCM이 없으므로, 앱이 앞에 있는 동안 1분마다 다시 조회한다
+  // 가족·알림: FCM은 빠질 수 있고 iPhone은 FCM이 없으므로, 앱이 앞에 있는 동안 30초마다 다시 조회한다
   Timer? linkPoll;
   void startLinkPoll() {
     if (linkFeed == null) return;
     linkPoll?.cancel();
-    linkPoll = Timer.periodic(const Duration(minutes: 1), (_) => unawaited(linkFeed.refresh()));
+    linkPoll = Timer.periodic(const Duration(seconds: 30), (_) => unawaited(repository.refresh()));
   }
 
   startLinkPoll();
   // 앱이 다시 앞으로 오면 가족 목록을 다시 조회하고, 프로필·FCM 토큰 등록이 실패했던 경우 바로 다시 시도한다
   AppLifecycleListener(
     onResume: () {
-      unawaited(linkFeed?.refresh());
+      unawaited(repository.refresh());
       startLinkPoll();
       unawaited(profile.retryNow());
       unawaited(push.retry());

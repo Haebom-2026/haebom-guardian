@@ -139,6 +139,7 @@ class PushService extends ChangeNotifier {
     required this.deviceId,
     required this.onOpen,
     this.onLinkChanged,
+    this.onContentChanged,
     String? platform,
   }) : platform = platform ?? (defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android');
 
@@ -150,6 +151,9 @@ class PushService extends ChangeNotifier {
 
   /// FCM `kind: link`를 받았을 때 (가족 목록 다시 조회)
   final void Function()? onLinkChanged;
+
+  /// FCM `kind: notification | approval`을 받았거나 눌렀을 때 (알림·승인 목록 다시 조회)
+  final void Function()? onContentChanged;
   final String platform;
 
   PushState state = PushState.idle;
@@ -175,6 +179,7 @@ class PushService extends ChangeNotifier {
       }
       final t = m.target;
       if (t != null) {
+        onContentChanged?.call();
         notifications.showRemote(t, type: m.type);
       } else if (m.title != null || m.body != null) {
         // 규격의 data(kind·id)가 없는 메시지 (예: Firebase 콘솔 테스트 메시지): 제목·본문만 표시, 탭하면 앱 열기
@@ -183,7 +188,10 @@ class PushService extends ChangeNotifier {
     }));
     _subs.add(messaging.onMessageOpenedApp.listen((m) {
       final t = m.target;
-      if (t != null) onOpen(t);
+      if (t != null) {
+        onContentChanged?.call();
+        onOpen(t);
+      }
     }));
     _subs.add(messaging.onTokenRefresh.listen(_register));
 

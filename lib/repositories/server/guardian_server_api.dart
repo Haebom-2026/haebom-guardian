@@ -7,11 +7,13 @@ import 'package:http/http.dart' as http;
 import '../../models/family_link.dart';
 import '../guardian_repository.dart';
 
-/// 공통 서버(다른 팀원 담당)에 보내는 쓰기 요청.
+/// 공통 서버(다른 팀원 담당, AWS) REST API.
 ///
-/// 읽기는 Firestore 실시간 구독으로 하므로 여기에 없다.
-/// 서버 규격이 확정되지 않았으므로(`docs/SERVER_REQUIREMENTS.md`) 경로·형식은 [ServerEndpoints] 한곳에 모았다.
+/// 규격: 서버 저장소 `docs/api/s1-users-links.md` (S1: 사용자·기기·연결). 경로는 [ServerEndpoints] 한곳에 모았다.
 abstract class GuardianServerApi {
+  /// #20 연결된 어르신 목록 (연결 시각 순). 응답에는 guardianId가 없으므로 빈 문자열로 둔다.
+  Future<List<FamilyLink>> fetchLinks();
+
   /// 보호자 프로필(users/{uid}, role=guardian)을 서버가 만들게 한다. 이미 있으면 그대로 둔다.
   Future<void> ensureGuardianProfile({String? name});
 
@@ -31,7 +33,7 @@ abstract class GuardianServerApi {
   Future<void> unregisterDevice(String deviceId);
 }
 
-/// 서버 엔드포인트 정의. 💡 v2 초안(`docs/GUARDIAN_INTEGRATION.md` 4장) 기준이며, 서버 담당자 규격에 맞춰 이곳만 고친다.
+/// 서버 엔드포인트 정의 (S1 계약서 기준). 서버가 경로를 바꾸면 이곳만 고친다.
 class ServerEndpoints {
   const ServerEndpoints({this.prefix = '/v1'});
   final String prefix;
@@ -58,9 +60,10 @@ RepositoryErrorCode errorCodeForReason(String? reason) {
 
 /// HTTPS REST 구현. 모든 요청에 Firebase ID 토큰을 Bearer로 붙인다.
 ///
-/// 재시도 (공통 규격 5.1, 요청마다 한 번씩만):
-/// - `401` → ID 토큰을 새로 받아 다시 보낸다.
+/// 재시도 (S1 계약서 1장, 요청마다 한 번씩만):
+/// - `401` → ID 토큰을 새로 받아 다시 보낸다 (API Gateway 401은 본문 형식이 달라 상태 코드로만 판단).
 /// - `403 profile-required` → 보호자 프로필(#2)을 등록한 뒤 다시 보낸다.
+/// - `503 unavailable` → 같은 요청을 한 번 더 보낸다.
 /// 다시 보낼 때도 같은 Idempotency-Key를 쓴다.
 class HttpGuardianServerApi implements GuardianServerApi {
   HttpGuardianServerApi({
@@ -114,12 +117,17 @@ class HttpGuardianServerApi implements GuardianServerApi {
     final key = idempotent ? _newKey() : null;
     var refreshedToken = false;
     var registeredProfile = false;
+    var retriedUnavailable = false;
     while (true) {
       try {
         return await _sendOnce(method, path, body: body, idempotencyKey: key, freshToken: refreshedToken);
       } on _HttpFailure catch (f) {
         if (f.status == 401 && !refreshedToken) {
           refreshedToken = true;
+          continue;
+        }
+        if (f.status == 503 && !retriedUnavailable) {
+          retriedUnavailable = true;
           continue;
         }
         if (f.reason == 'profile-required' && !registeredProfile && path != endpoints.profile()) {
@@ -201,6 +209,28 @@ class HttpGuardianServerApi implements GuardianServerApi {
   }
 
   @override
+  Future<List<FamilyLink>> fetchLinks() async {
+    final json = await _send('GET', endpoints.links());
+    final raw = json['links'];
+    if (raw is! List) return const [];
+    return [
+      for (final l in raw.whereType<Map<String, Object?>>())
+        if ((l['elderId'] as String? ?? '').isNotEmpty) linkFromJson(l),
+    ];
+  }
+
+  /// #14·#20 응답의 연결 한 건 → 모델
+  static FamilyLink linkFromJson(Map<String, Object?> json, {String elderLabel = '', String guardianLabel = ''}) =>
+      FamilyLink(
+        elderId: json['elderId'] as String? ?? '',
+        guardianId: json['guardianId'] as String? ?? '',
+        elderName: json['elderName'] as String? ?? '',
+        elderLabel: json['elderLabel'] as String? ?? json['relationship'] as String? ?? elderLabel,
+        guardianLabel: json['guardianLabel'] as String? ?? guardianLabel,
+        connectedAt: DateTime.tryParse(json['connectedAt'] as String? ?? '')?.toLocal() ?? DateTime.now(),
+      );
+
+  @override
   Future<void> respondApproval(String approvalId, {required bool approve}) =>
       _send('POST', endpoints.respondApproval(approvalId), body: {'decision': approve ? 'approve' : 'reject'});
 
@@ -209,18 +239,18 @@ class HttpGuardianServerApi implements GuardianServerApi {
     final json = await _send('POST', endpoints.links(),
         body: {'code': code.trim(), 'elderLabel': elderLabel.trim(), 'guardianLabel': guardianLabel.trim()},
         idempotent: true);
-    return FamilyLink(
-      elderId: json['elderId'] as String? ?? '',
-      guardianId: '',
-      elderName: json['elderName'] as String? ?? '',
-      elderLabel: json['elderLabel'] as String? ?? json['relationship'] as String? ?? elderLabel.trim(),
-      guardianLabel: json['guardianLabel'] as String? ?? guardianLabel.trim(),
-      connectedAt: DateTime.tryParse(json['connectedAt'] as String? ?? '')?.toLocal() ?? DateTime.now(),
-    );
+    return linkFromJson(json, elderLabel: elderLabel.trim(), guardianLabel: guardianLabel.trim());
   }
 
+  /// 이미 없는 연결(404)도 "해제됨"으로 본다 (S1 계약서 #15).
   @override
-  Future<void> disconnect(String elderId) => _send('DELETE', endpoints.link(elderId));
+  Future<void> disconnect(String elderId) async {
+    try {
+      await _send('DELETE', endpoints.link(elderId));
+    } on RepositoryException catch (e) {
+      if (e.code != RepositoryErrorCode.notFound) rethrow;
+    }
+  }
 
   @override
   Future<void> registerDevice({required String deviceId, required String fcmToken, required String platform}) =>

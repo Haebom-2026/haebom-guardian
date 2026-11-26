@@ -15,6 +15,7 @@ import 'app/routes.dart';
 import 'app/theme.dart';
 import 'controllers/settings_controller.dart';
 import 'repositories/mock_backend.dart';
+import 'repositories/server/api_link_feed.dart';
 import 'repositories/server/guardian_server_api.dart';
 import 'repositories/server/server_repository.dart';
 import 'repositories/server/server_url.dart';
@@ -102,20 +103,32 @@ Future<void> _runWithServer(BackendConfig config) async {
     ));
   }
 
-  final firestore = FirebaseFirestore.instance;
-  final serverUrl = ServerUrlResolver(
-    fixedUrl: config.serverBaseUrl,
-    firestore: firestore,
-    configDoc: config.serverConfigDoc,
-  )..start();
+  // 실제 서버(AWS)는 주소를 config/firebase.json의 SERVER_BASE_URL로 받는다.
+  // 로컬 Firebase 에뮬레이터 검증 때만 Firestore에서 데이터를 읽는다.
+  if (!config.useEmulator && config.serverBaseUrl.isEmpty) {
+    return runApp(const _StartupErrorApp(
+      title: '서버 주소가 없습니다',
+      message: 'config/firebase.json에 SERVER_BASE_URL(공통 서버 dev 주소)을 넣은 뒤\n'
+          'flutter run --dart-define-from-file=config/firebase.json 으로 실행하세요.',
+    ));
+  }
+  final firestore = config.useEmulator ? FirebaseFirestore.instance : null;
+  final serverUrl = config.useEmulator
+      ? (ServerUrlResolver(fixedUrl: config.serverBaseUrl, firestore: firestore!, configDoc: config.serverConfigDoc)
+            ..start())
+          .current
+      : () async => config.serverBaseUrl;
   final api = HttpGuardianServerApi(
-    baseUrl: serverUrl.current,
+    baseUrl: serverUrl,
     idToken: () async => FirebaseAuth.instance.currentUser?.getIdToken(),
     refreshIdToken: () async => FirebaseAuth.instance.currentUser?.getIdToken(true),
   );
+  final linkFeed = firestore == null ? ApiLinkFeed(api.fetchLinks) : null;
 
   final deps = AppDependencies(
-    repository: ServerGuardianRepository(firestore: firestore, guardianId: user.uid, api: api),
+    repository: linkFeed != null
+        ? ServerGuardianRepository.api(guardianId: user.uid, api: api, linkFeed: linkFeed)
+        : ServerGuardianRepository(firestore: firestore!, guardianId: user.uid, api: api),
     notifier: PluginLocalNotifier(),
     settingsStorage: DeviceSettingsStorage(),
   );
@@ -134,16 +147,37 @@ Future<void> _runWithServer(BackendConfig config) async {
     notifications: deps.notifications,
     deviceId: DeviceIdStore().get,
     onOpen: open,
+    onLinkChanged: () => unawaited(linkFeed?.refresh()),
   );
   deps.push = push;
   // 서버 규격상 기기 등록 전에 보호자 프로필이 필요하다. 서버가 꺼져 있어도 앱은 계속 동작하고,
   // 등록될 때까지 점점 긴 간격으로 다시 시도한다. 성공하면 실패했던 FCM 토큰 등록도 다시 해 본다.
-  final profile = ProfileRegistrar(register: api.ensureGuardianProfile, onRegistered: push.retry);
-  // 앱이 다시 앞으로 오면 프로필·FCM 토큰 등록이 실패했던 경우 바로 다시 시도한다
-  AppLifecycleListener(onResume: () {
-    unawaited(profile.retryNow());
-    unawaited(push.retry());
-  });
+  final profile = ProfileRegistrar(
+    register: api.ensureGuardianProfile,
+    onRegistered: () async {
+      await push.retry();
+      await linkFeed?.refresh();
+    },
+  );
+  // 가족 목록: FCM은 빠질 수 있고 iPhone은 FCM이 없으므로, 앱이 앞에 있는 동안 1분마다 다시 조회한다
+  Timer? linkPoll;
+  void startLinkPoll() {
+    if (linkFeed == null) return;
+    linkPoll?.cancel();
+    linkPoll = Timer.periodic(const Duration(minutes: 1), (_) => unawaited(linkFeed.refresh()));
+  }
+
+  startLinkPoll();
+  // 앱이 다시 앞으로 오면 가족 목록을 다시 조회하고, 프로필·FCM 토큰 등록이 실패했던 경우 바로 다시 시도한다
+  AppLifecycleListener(
+    onResume: () {
+      unawaited(linkFeed?.refresh());
+      startLinkPoll();
+      unawaited(profile.retryNow());
+      unawaited(push.retry());
+    },
+    onPause: () => linkPoll?.cancel(),
+  );
 
   runApp(HaebomFamilyApp(deps: deps));
 

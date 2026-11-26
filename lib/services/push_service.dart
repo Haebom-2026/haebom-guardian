@@ -28,6 +28,9 @@ class PushMessage {
   }
 
   String? get type => data['type'];
+
+  /// 연결 생성·해제 알림 (`data.kind` = link, 화면에 띄우지 않는 data 메시지). S1 계약서 5장
+  bool get isLinkChange => data['kind'] == 'link';
 }
 
 /// FirebaseMessaging 추상화 (테스트에서 가짜 구현 사용)
@@ -135,6 +138,7 @@ class PushService extends ChangeNotifier {
     required this.notifications,
     required this.deviceId,
     required this.onOpen,
+    this.onLinkChanged,
     String? platform,
   }) : platform = platform ?? (defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android');
 
@@ -143,6 +147,9 @@ class PushService extends ChangeNotifier {
   final NotificationService notifications;
   final Future<String> Function() deviceId;
   final void Function(AlertTarget target) onOpen;
+
+  /// FCM `kind: link`를 받았을 때 (가족 목록 다시 조회)
+  final void Function()? onLinkChanged;
   final String platform;
 
   PushState state = PushState.idle;
@@ -162,6 +169,10 @@ class PushService extends ChangeNotifier {
 
   Future<void> start() async {
     _subs.add(messaging.onForegroundMessage.listen((m) {
+      if (m.isLinkChange) {
+        onLinkChanged?.call();
+        return;
+      }
       final t = m.target;
       if (t != null) {
         notifications.showRemote(t, type: m.type);

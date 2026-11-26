@@ -8,11 +8,18 @@ import '../../models/family_link.dart';
 import '../../models/notification_item.dart';
 import '../../models/sensitivity.dart';
 import '../guardian_repository.dart';
+import 'api_link_feed.dart';
 import 'guardian_server_api.dart';
 import 'resilient_stream.dart';
 
-/// 실제 서버용 보호자 저장소.
+/// 실제 서버용 보호자 저장소. 두 가지 방식으로 만들 수 있다.
 ///
+/// **서버 API 방식** ([ServerGuardianRepository.api] 생성자, 실제 운영 — AWS 서버):
+/// - 가족 목록: 서버 #20 조회 ([ApiLinkFeed]). FCM `kind: link`·앱 복귀·주기 조회로 갱신
+/// - 연결·해제·기기 등록: 서버 API
+/// - 알림·승인: 서버 S2·S3 API가 아직 없어 빈 목록 (API가 나오면 이곳에 연결)
+///
+/// **Firestore 방식** (기본 생성자, 로컬 Firebase 에뮬레이터 검증용):
 /// - **읽기**: Firestore 실시간 구독 (links → 연결된 가족별 notifications / approvals)
 /// - **확인(readBy)**: Firestore에 자기 항목만 직접 쓰기 (보안 규칙으로 제한)
 /// - **쓰기(승인·연결·해제)**: 공통 서버 API ([GuardianServerApi])
@@ -25,16 +32,34 @@ import 'resilient_stream.dart';
 /// 오류를 화면에 알린 뒤 잠시 기다렸다가 같은 쿼리를 다시 구독한다 (앱 재실행 불필요).
 class ServerGuardianRepository implements GuardianRepository {
   ServerGuardianRepository({
-    required this.firestore,
+    required FirebaseFirestore this.firestore,
     required this.guardianId,
     required this.api,
     DateTime Function()? clock,
     this.reconnectDelay = defaultReconnectDelay,
     @visibleForTesting Stream<QuerySnapshot<Map<String, dynamic>>> Function(Query<Map<String, dynamic>> q)? snapshots,
   })  : _clock = clock ?? DateTime.now,
-        _snapshots = snapshots ?? ((q) => q.snapshots());
+        _snapshots = snapshots ?? ((q) => q.snapshots()),
+        linkFeed = null;
 
-  final FirebaseFirestore firestore;
+  /// 서버 API 방식 (Firestore를 쓰지 않음)
+  ServerGuardianRepository.api({
+    required this.guardianId,
+    required this.api,
+    required ApiLinkFeed this.linkFeed,
+    DateTime Function()? clock,
+  })  : firestore = null,
+        _clock = clock ?? DateTime.now,
+        reconnectDelay = defaultReconnectDelay,
+        _snapshots = ((q) => q.snapshots());
+
+  /// Firestore 방식에서만 사용 (서버 API 방식이면 null)
+  final FirebaseFirestore? firestore;
+
+  /// 서버 API 방식의 가족 목록 (Firestore 방식이면 null)
+  final ApiLinkFeed? linkFeed;
+
+  bool get _apiMode => linkFeed != null;
   final String guardianId;
   final GuardianServerApi api;
   final DateTime Function() _clock;
@@ -53,28 +78,47 @@ class ServerGuardianRepository implements GuardianRepository {
   @override
   DateTime now() => _clock();
 
-  CollectionReference<Map<String, dynamic>> get _links => firestore.collection('links');
-  CollectionReference<Map<String, dynamic>> get _notifications => firestore.collection('notifications');
-  CollectionReference<Map<String, dynamic>> get _approvals => firestore.collection('approvals');
+  CollectionReference<Map<String, dynamic>> get _links => firestore!.collection('links');
+  CollectionReference<Map<String, dynamic>> get _notifications => firestore!.collection('notifications');
+  CollectionReference<Map<String, dynamic>> get _approvals => firestore!.collection('approvals');
 
   Query<Map<String, dynamic>> _myLinks() => _links.where('guardianId', isEqualTo: guardianId);
 
   @override
-  Stream<List<FamilyLink>> watchLinks() => _live(_myLinks()).map((s) {
+  Stream<List<FamilyLink>> watchLinks() {
+    if (_apiMode) {
+      // #20 응답에는 guardianId가 없다 (본인 목록이므로 나)
+      return linkFeed!.stream.map((list) => [
+            for (final l in list)
+              FamilyLink(
+                elderId: l.elderId,
+                guardianId: guardianId,
+                elderName: l.elderName,
+                elderLabel: l.elderLabel,
+                guardianLabel: l.guardianLabel,
+                connectedAt: l.connectedAt,
+              ),
+          ]);
+    }
+    return _firestoreLinks();
+  }
+
+  Stream<List<FamilyLink>> _firestoreLinks() => _live(_myLinks()).map((s) {
         final list = s.docs.map((d) => FirestoreMappers.link(d.data())).toList()
           ..sort((a, b) => a.connectedAt.compareTo(b.connectedAt));
         return list;
       }).handleError(_rethrowMapped);
 
+  /// 서버 API 방식: 알림·승인 조회 API(S2·S3)가 아직 없어 빈 목록
   @override
-  Stream<List<NotificationItem>> watchNotifications() => _perElder(
+  Stream<List<NotificationItem>> watchNotifications() => _apiMode ? Stream.value(const []) : _perElder(
         _notifications,
         (id, data) => FirestoreMappers.notification(id, data, _clock),
         (a, b) => b.createdAt.compareTo(a.createdAt),
       );
 
   @override
-  Stream<List<ApprovalRequest>> watchApprovals() => _perElder(
+  Stream<List<ApprovalRequest>> watchApprovals() => _apiMode ? Stream.value(const []) : _perElder(
         _approvals,
         (id, data) => FirestoreMappers.approval(id, data, _clock),
         (a, b) => b.createdAt.compareTo(a.createdAt),
@@ -152,6 +196,7 @@ class ServerGuardianRepository implements GuardianRepository {
 
   @override
   Future<NotificationItem> getNotification(String id) async {
+    if (_apiMode) throw const RepositoryException(RepositoryErrorCode.notFound, '알림 조회 API(S2) 준비 중');
     final doc = await _get(_notifications.doc(id));
     final data = doc.data();
     if (!doc.exists || data == null) throw const RepositoryException(RepositoryErrorCode.notFound);
@@ -162,6 +207,7 @@ class ServerGuardianRepository implements GuardianRepository {
 
   @override
   Future<ApprovalRequest> getApproval(String id) async {
+    if (_apiMode) throw const RepositoryException(RepositoryErrorCode.notFound, '승인 조회 API(S3) 준비 중');
     final doc = await _get(_approvals.doc(id));
     final data = doc.data();
     if (!doc.exists || data == null) throw const RepositoryException(RepositoryErrorCode.notFound);
@@ -173,6 +219,7 @@ class ServerGuardianRepository implements GuardianRepository {
   /// "확인했어요": 자기 readBy 항목만 쓴다. 이미 확인한 알림은 다시 쓰지 않는다(처음 확인 시각 유지).
   @override
   Future<void> markNotificationRead(String id) async {
+    if (_apiMode) throw const RepositoryException(RepositoryErrorCode.unavailable, '알림 확인 API(S2) 준비 중');
     final n = await getNotification(id);
     if (n.isReadBy(guardianId)) return;
     try {
@@ -184,6 +231,7 @@ class ServerGuardianRepository implements GuardianRepository {
 
   @override
   Future<void> markAllNotificationsRead({String? elderId}) async {
+    if (_apiMode) return; // 서버 API 방식에는 아직 알림이 없다
     try {
       final links = await _myLinks().get();
       final elders = links.docs
@@ -200,7 +248,7 @@ class ServerGuardianRepository implements GuardianRepository {
       }
       // Firestore 일괄 쓰기는 500건 제한
       for (var i = 0; i < refs.length; i += 450) {
-        final batch = firestore.batch();
+        final batch = firestore!.batch();
         for (final r in refs.skip(i).take(450)) {
           batch.update(r, {'readBy.$guardianId': FieldValue.serverTimestamp()});
         }
@@ -220,6 +268,7 @@ class ServerGuardianRepository implements GuardianRepository {
   @override
   Future<FamilyLink> connectWithCode(String code, {required String elderLabel, String guardianLabel = ''}) async {
     final link = await api.connectWithCode(code, elderLabel: elderLabel, guardianLabel: guardianLabel);
+    unawaited(linkFeed?.refresh());
     return FamilyLink(
       elderId: link.elderId,
       guardianId: guardianId,
@@ -231,7 +280,10 @@ class ServerGuardianRepository implements GuardianRepository {
   }
 
   @override
-  Future<void> disconnect(String elderId) => api.disconnect(elderId);
+  Future<void> disconnect(String elderId) async {
+    await api.disconnect(elderId);
+    await linkFeed?.refresh();
+  }
 
   static Never _rethrowMapped(Object e) => throw mapFirestoreError(e);
 }

@@ -404,6 +404,18 @@ class _DeveloperScreenState extends State<DeveloperScreen> {
                 ),
               ),
             ]),
+            const SectionHeader('⑦ 가족의 도전 (💡 제안)'),
+            Text('고령자 앱에서 어르신이 추천받은 도전을 해냈을 때를 흉내 냅니다. 해냈다는 사실만 전달됩니다.', style: t.textTheme.bodySmall),
+            const SizedBox(height: 8),
+            if (_b.challengesFor(MockBackend.meId).every((c) => c.isDone))
+              Text('도전 중인 항목 없음 (홈 "가족의 도전 → 추천하기"로 추가)', style: t.textTheme.bodySmall)
+            else
+              _buttons([
+                for (final c in _b.challengesFor(MockBackend.meId).where((c) => !c.isDone)) ...[
+                  ('${_elderLabel(c.elderId)} · ${c.title} 해냄', () => _completeChallenge(c.id, withHelp: false)),
+                  ('${_elderLabel(c.elderId)} · 도우미와 함께 해냄', () => _completeChallenge(c.id, withHelp: true)),
+                ],
+              ]),
             const SectionHeader('⑥ 초기화 (18)'),
             OutlinedButton.icon(
               onPressed: _reset,
@@ -421,6 +433,11 @@ class _DeveloperScreenState extends State<DeveloperScreen> {
         ),
       ),
     );
+  }
+
+  void _completeChallenge(String id, {required bool withHelp}) {
+    final c = _b.completeChallenge(id, withHelp: withHelp);
+    _write(c == null ? '실패: 없거나 이미 해낸 도전' : '${_elderLabel(c.elderId)}: "${c.title}" 해냄${withHelp ? ' (도우미 안내와 함께)' : ''}');
   }
 
   Widget _buttons(List<(String, VoidCallback)> items, {bool dense = false}) => Wrap(

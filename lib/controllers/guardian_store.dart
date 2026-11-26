@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../models/approval_request.dart';
+import '../models/challenge.dart';
 import '../models/family_link.dart';
 import '../models/notification_item.dart';
 import '../repositories/guardian_repository.dart';
@@ -33,6 +34,11 @@ class GuardianStore extends ChangeNotifier {
         _approvalsLoaded = true;
         notifyListeners();
       }, onError: (Object e) => _onError(_Feed.approvals, e)),
+      // 도전은 부가 기능이라 첫 화면 로딩(isLoaded)을 기다리게 하지 않는다
+      repository.watchChallenges().listen((v) {
+        challenges = v;
+        notifyListeners();
+      }, onError: (Object e) => debugPrint('도전 목록 오류: $e')),
     ];
   }
 
@@ -42,6 +48,7 @@ class GuardianStore extends ChangeNotifier {
   List<FamilyLink> links = const [];
   List<NotificationItem> notifications = const [];
   List<ApprovalRequest> approvals = const [];
+  List<Challenge> challenges = const [];
   /// 구독별 마지막 오류. 그 구독이 다시 데이터를 받으면 지운다 (다른 구독의 데이터로는 지우지 않는다).
   final Map<_Feed, Object> _errors = {};
   Object? get lastError => _errors.isEmpty ? null : _errors.values.last;
@@ -104,7 +111,17 @@ class GuardianStore extends ChangeNotifier {
         .toList();
   }
 
-  int unreadCount({String? elderId}) => notificationsFor(elderId: elderId, unreadOnly: true).length;
+  bool get supportsChallenges => repository.supportsChallenges;
+
+  List<Challenge> challengesFor({String? elderId}) =>
+      challenges.where((c) => _matches(c.elderId, elderId)).toList();
+
+  Future<Challenge> suggestChallenge(String elderId, String templateId) =>
+      repository.suggestChallenge(elderId, templateId);
+
+  Future<void> cheerChallenge(String id, String message) => repository.cheerChallenge(id, message);
+
+    int unreadCount({String? elderId}) => notificationsFor(elderId: elderId, unreadOnly: true).length;
 
   int todayCount({String? elderId}) {
     final t = now();

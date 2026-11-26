@@ -1,4 +1,5 @@
 import '../models/approval_request.dart';
+import '../models/challenge.dart';
 import '../models/family_link.dart';
 import '../models/notification_item.dart';
 
@@ -87,6 +88,18 @@ abstract class GuardianRepository {
 
   /// 가족 연결 해제
   Future<void> disconnect(String elderId);
+
+  /// 가족의 도전 (💡 제안 단계, 서버 규격 없음). false면 화면에서 도전 섹션을 숨긴다.
+  bool get supportsChallenges;
+
+  /// 현재 보호자가 볼 수 있는 도전 목록, 최신순 (실시간)
+  Stream<List<Challenge>> watchChallenges();
+
+  /// 어르신께 도전 추천하기 (하실지는 어르신이 정한다)
+  Future<Challenge> suggestChallenge(String elderId, String templateId);
+
+  /// 해낸 도전에 칭찬 보내기
+  Future<void> cheerChallenge(String id, String message);
 
   /// 화면을 당겨 새로고침할 때: 서버에서 가족·알림·승인을 다시 조회한다 (실시간 구독 저장소는 할 일 없음)
   Future<void> refresh();

@@ -118,19 +118,11 @@ class HomeScreen extends StatelessWidget {
                       padding: const EdgeInsets.only(bottom: 32),
                       children: [
                         // 첫 문구: 지금 확인할 일이 몇 건인지 (햇살 그림은 장식)
-                        _HomeHero(count: helpCount + unreadNormal.length, now: now),
+                        _HomeHero(count: helpCount + unreadNormal.length, today: todayCount, now: now),
 
                         // ① 누구의 정보인지
                         _FamilyHeader(store: store),
                         if (store.links.length >= 2) ...[const SizedBox(height: 12), FamilyFilterBar(store: store)],
-                        const SizedBox(height: Space.gap),
-                        _SummaryTiles(
-                          today: todayCount,
-                          unread: unread.length,
-                          pending: pending.length,
-                          onNotifications: () => deps.tabIndex.value = 1,
-                          onApprovals: () => deps.tabIndex.value = 2,
-                        ),
 
                         // ② 도움이 필요한 일: SOS → 도움 필요 → 승인 대기
                         SectionHeader(
@@ -295,8 +287,11 @@ class _News {
 /// 홈 첫 문구: "확인할 일이 N건 있어요" + 날짜. 오른쪽 위 햇살은 장식(낭독 안 함).
 /// 확인할 일이 없을 때도 '안전하다'고 말하지 않는다.
 class _HomeHero extends StatelessWidget {
-  const _HomeHero({required this.count, required this.now});
+  const _HomeHero({required this.count, required this.today, required this.now});
   final int count;
+
+  /// 오늘 온 알림 수 (확인한 것 포함). 따로 숫자 카드를 두지 않고 첫 문구 아래 한 줄로 보여 준다
+  final int today;
   final DateTime now;
 
   @override
@@ -336,6 +331,12 @@ class _HomeHero extends StatelessWidget {
                           ),
                           style: headline,
                         ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  today == 0 ? '오늘 온 알림은 없어요' : '오늘 알림 $today건',
+                  key: const Key('home_today_count'),
+                  style: t.textTheme.bodyMedium?.copyWith(color: k.textSub),
                 ),
               ],
             ),
@@ -381,129 +382,6 @@ class _SunPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-/// 숫자 카드 3개: 오늘 알림 / 확인 전 / 승인 대기 (아이콘 + 글자 + 숫자)
-class _SummaryTiles extends StatelessWidget {
-  const _SummaryTiles({
-    required this.today,
-    required this.unread,
-    required this.pending,
-    required this.onNotifications,
-    required this.onApprovals,
-  });
-  final int today;
-  final int unread;
-  final int pending;
-  final VoidCallback onNotifications;
-  final VoidCallback onApprovals;
-
-  @override
-  Widget build(BuildContext context) {
-    final k = HaebomTokens.of(context);
-    final light = Theme.of(context).brightness == Brightness.light;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: Space.page - 4),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: _Tile(
-                icon: Icons.notifications_none_rounded,
-                iconColor: light ? const Color(0xFF8A5A00) : k.brand,
-                tint: Theme.of(context).colorScheme.secondaryContainer,
-                label: '오늘 알림',
-                value: today,
-                onTap: onNotifications,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _Tile(
-                icon: Icons.mark_email_unread_outlined,
-                iconColor: k.dangerText,
-                tint: k.dangerBg,
-                label: '확인 전',
-                value: unread,
-                valueColor: unread > 0 ? k.dangerText : null,
-                onTap: onNotifications,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _Tile(
-                icon: Icons.verified_user_outlined,
-                iconColor: k.cautionText,
-                tint: k.cautionBg,
-                label: '승인 대기',
-                value: pending,
-                valueColor: pending > 0 ? k.cautionText : null,
-                onTap: onApprovals,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Tile extends StatelessWidget {
-  const _Tile({
-    required this.icon,
-    required this.iconColor,
-    required this.tint,
-    required this.label,
-    required this.value,
-    this.valueColor,
-    required this.onTap,
-  });
-  final IconData icon;
-  final Color iconColor;
-  final Color tint;
-  final String label;
-  final int value;
-  final Color? valueColor;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context);
-    return Container(
-      decoration: cardDecoration(context),
-      clipBehavior: Clip.antiAlias,
-      child: Material(
-        type: MaterialType.transparency,
-        child: InkWell(
-          onTap: onTap,
-          child: Semantics(
-            button: true,
-            label: '$label $value',
-            excludeSemantics: true,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 16, 10, 14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(color: tint, borderRadius: BorderRadius.circular(11)),
-                    child: Icon(icon, size: 18, color: iconColor),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(label, style: t.textTheme.bodySmall?.copyWith(fontSize: 13)),
-                  const SizedBox(height: 2),
-                  Text('$value', style: t.textTheme.titleLarge?.copyWith(fontSize: 22, color: valueColor)),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 /// 누구의 정보를 보고 있는지: 한 명이면 "어머니 (김순자)", 여러 명이면 호칭 목록 + 가족 선택 칩

@@ -97,6 +97,13 @@ void main() {
     }
   });
 
+  testWidgets('홈: 숫자는 첫 문구 한 곳에만 (숫자 카드 없음), 오늘 알림 수는 그 아래 한 줄', (tester) async {
+    final env = await pumpPhone(tester);
+    final today = env.deps.store.notifications.where((n) => n.createdAt.day == env.clock.now().day).length;
+    expect(find.text(today == 0 ? '오늘 온 알림은 없어요' : '오늘 알림 $today건'), findsOneWidget);
+    expect(find.text('확인 전'), findsNothing, reason: '섹션과 숫자가 달라 보이던 숫자 카드는 없앴다');
+  });
+
   testWidgets('홈: 최근 소식은 오늘·어제 것만 (그보다 오래된 소식은 알림·승인 기록에서 본다)', (tester) async {
     tester.view.physicalSize = const Size(412, 915) * 3;
     tester.view.devicePixelRatio = 3;

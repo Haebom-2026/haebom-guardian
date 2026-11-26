@@ -118,7 +118,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
                         const Divider(),
                         const SizedBox(height: 8),
                         // 가운데: 자세한 정보 (왼쪽 항목 · 오른쪽 값)
-                        _row(context, '가족', '$who (${store.linkFor(n.elderId)?.elderName ?? '-'})'),
+                        _row(context, '가족', store.linkFor(n.elderId)?.labelWithName ?? who),
                         if (n.appName.isNotEmpty) _row(context, '서비스', n.appName),
                         if (n.category != null && n.category != SensitivityCategory.none)
                           _row(context, '분류', n.category!.label),

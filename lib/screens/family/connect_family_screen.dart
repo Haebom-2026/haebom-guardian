@@ -58,7 +58,7 @@ class _ConnectFamilyScreenState extends State<ConnectFamilyScreen> {
       if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${link.displayName}(${link.elderName})와(과) 연결되었습니다.')),
+        SnackBar(content: Text('${link.labelWithName}와(과) 연결되었습니다.')),
       );
     } on RepositoryException catch (e) {
       if (mounted) setState(() => _error = e.userMessage);

@@ -27,6 +27,12 @@ class FamilyLink {
   /// 화면에 표시할 이름. 호칭이 없으면 이름을 사용한다.
   String get displayName => elderLabel.trim().isEmpty ? elderName : elderLabel;
 
+  /// "어머니 (김순자)". 실명이 비어 있거나 호칭과 같으면 호칭만 (빈 괄호를 보이지 않게).
+  String get labelWithName {
+    final name = elderName.trim();
+    return name.isEmpty || name == displayName ? displayName : '$displayName ($name)';
+  }
+
   Map<String, Object?> toMap() => {
         'elderId': elderId,
         'guardianId': guardianId,

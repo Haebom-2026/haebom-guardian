@@ -203,6 +203,14 @@ void main() {
     });
   });
 
+  test('고령자 이름이 비어 있으면 빈 괄호 없이 호칭만 보여 준다', () {
+    FamilyLink l(String name, String label) =>
+        FamilyLink(elderId: 'e', guardianId: 'g', elderName: name, elderLabel: label, connectedAt: DateTime(2026));
+    expect(l('김순자', '어머니').labelWithName, '어머니 (김순자)');
+    expect(l('', '어머니').labelWithName, '어머니');
+    expect(l('김순자', '').labelWithName, '김순자');
+  });
+
   test('FCM data kind=link 는 연결 변경 메시지 (상세 화면 이동 대상 아님)', () {
     const m = PushMessage({'kind': 'link', 'change': 'created', 'elderId': 'e_1', 'guardianId': 'g_1'});
     expect(m.isLinkChange, isTrue);

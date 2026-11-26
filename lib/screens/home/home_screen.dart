@@ -470,7 +470,7 @@ class _FamilyHeader extends StatelessWidget {
     final links = store.links;
     final selected = store.selectedElderId == null ? null : store.linkFor(store.selectedElderId!);
     final FamilyLink? one = selected ?? (links.length == 1 ? links.first : null);
-    final title = one != null ? '${one.displayName} (${one.elderName})' : links.map((l) => l.displayName).join(', ');
+    final title = one != null ? one.labelWithName : links.map((l) => l.displayName).join(', ');
     final latest = store.notificationsFor(elderId: store.selectedElderId).firstOrNull;
     final sub = [
       '연결된 가족 ${links.length}명',

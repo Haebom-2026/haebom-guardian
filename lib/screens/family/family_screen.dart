@@ -79,7 +79,10 @@ class FamilyScreen extends StatelessWidget {
                                   Text(l.displayName, style: t.textTheme.titleSmall?.copyWith(fontSize: 17)),
                                   const SizedBox(height: 2),
                                   Text(
-                                    '${l.elderName} · ${formatDateTime(l.connectedAt, store.now())} 연결',
+                                    [
+                                      if (l.elderName.trim().isNotEmpty && l.elderName.trim() != l.displayName) l.elderName.trim(),
+                                      '${formatDateTime(l.connectedAt, store.now())} 연결',
+                                    ].join(' · '),
                                     style: t.textTheme.bodySmall,
                                   ),
                                 ],

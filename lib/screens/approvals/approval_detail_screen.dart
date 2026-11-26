@@ -108,7 +108,7 @@ class _ApprovalDetailScreenState extends State<ApprovalDetailScreen> {
               // 남은 시간(대기 중) 또는 결과 안내
               if (pending) _Countdown(remaining: a.remaining(now), total: a.expiresAt.difference(a.createdAt)) else _statusNotice(context, a, status),
               const SizedBox(height: 16),
-              _row(context, '요청자', '$who (${store.linkFor(a.elderId)?.elderName ?? '-'})'),
+              _row(context, '요청자', store.linkFor(a.elderId)?.labelWithName ?? who),
               _row(context, '서비스', a.appName),
               _row(context, '요청 내용', ApprovalActions.label(a.action)),
               if (a.category != null && a.category != SensitivityCategory.none) _row(context, '분류', a.category!.label),

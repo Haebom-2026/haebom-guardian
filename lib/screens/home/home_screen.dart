@@ -18,7 +18,7 @@ import '../../widgets/common.dart';
 /// ① 누구의 정보인지(가족) ② 지금 확인할 일(도움이 필요한 일) ③ 어떤 알림·요청이 있었는지(확인하지 않은 알림·최근 소식)
 ///
 /// 같은 항목은 한 곳에만 나온다: 확인 전 SOS·도움 필요 → "도움이 필요한 일", 확인 전 일반 알림 → "확인하지 않은 알림",
-/// 나머지(확인한 알림·처리된 승인) → "최근 소식". 승인·거절은 홈에서 하지 않고 상세 화면에서 내용을 보고 결정한다.
+/// 나머지(확인한 알림·처리된 승인) 중 오늘·어제 것 → "최근 소식". 승인·거절은 홈에서 하지 않고 상세 화면에서 내용을 보고 결정한다.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -88,15 +88,18 @@ class HomeScreen extends StatelessWidget {
               final pending = store.approvalsFor(elderId: elder, status: ApprovalStatus.pending);
               final unreadNormal = unread.where((n) => n.risk == RiskTone.normal).toList();
               final now = store.now();
-              final recent = <_News>[
-                for (final n in store.notificationsFor(elderId: elder).where((n) => !store.isUnread(n)))
-                  _News.notification(n),
-                for (final a
-                    in store
-                        .approvalsFor(elderId: elder)
-                        .where((a) => a.effectiveStatus(now) != ApprovalStatus.pending))
-                  _News.approval(a),
-              ]..sort((a, b) => b.at.compareTo(a.at));
+              final recent =
+                  <_News>[
+                      for (final n in store.notificationsFor(elderId: elder).where((n) => !store.isUnread(n)))
+                        _News.notification(n),
+                      for (final a
+                          in store
+                              .approvalsFor(elderId: elder)
+                              .where((a) => a.effectiveStatus(now) != ApprovalStatus.pending))
+                        _News.approval(a),
+                    ]
+                    ..removeWhere((x) => x.at.isBefore(DateTime(now.year, now.month, now.day - 1)))
+                    ..sort((a, b) => b.at.compareTo(a.at));
               final helpCount = sos.length + stuck.length + pending.length;
               final todayCount = store
                   .notificationsFor(elderId: elder)
@@ -172,10 +175,10 @@ class HomeScreen extends StatelessWidget {
                   if (unreadNormal.length > _unreadLimit)
                     _MoreLink('확인하지 않은 알림 ${unreadNormal.length - _unreadLimit}건 더 보기', () => deps.tabIndex.value = 1),
 
-                  // ④ 최근 소식 (확인한 알림·처리된 승인, 최대 3건)
+                  // ④ 최근 소식 (오늘·어제 확인한 알림·처리된 승인, 최대 3건. 더 있으면 알림 탭으로)
                   const SectionHeader('최근 소식'),
                   if (recent.isEmpty)
-                    const _Quiet('최근 소식이 없어요.')
+                    const _Quiet('오늘과 어제 처리한 소식이 없어요.')
                   else
                     CardGroup(
                       children: [
@@ -195,6 +198,8 @@ class HomeScreen extends StatelessWidget {
                         ],
                       ],
                     ),
+                  if (recent.length > _recentLimit)
+                    _MoreLink('최근 소식 ${recent.length - _recentLimit}건 더 보기', () => deps.tabIndex.value = 1),
                   const SizedBox(height: Space.section),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: Space.page),

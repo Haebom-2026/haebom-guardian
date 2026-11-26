@@ -1,4 +1,4 @@
-// 11-26 UI 개편 (사용자 확정안): 홈 = 가족 → 도움이 필요한 일(SOS → 도움 필요 → 승인 대기) → 확인하지 않은 알림 → 최근 소식(최대 3)
+// 11-26 UI 개편 (사용자 확정안): 홈 = 가족 → 도움이 필요한 일(SOS → 도움 필요 → 승인 대기) → 확인하지 않은 알림 → 최근 소식(오늘·어제, 최대 3)
 // 같은 항목이 두 곳에 나오지 않고, 홈에서는 바로 승인·거절하지 않는다.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:guardian_app/models/approval_request.dart';
@@ -95,6 +95,20 @@ void main() {
         expect(env.deps.store.isUnread(n), isFalse, reason: '확인 전 알림은 위 섹션에만');
       }
     }
+  });
+
+  testWidgets('홈: 최근 소식은 오늘·어제 것만 (그보다 오래된 소식은 알림·승인 기록에서 본다)', (tester) async {
+    tester.view.physicalSize = const Size(412, 915) * 3;
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final env = TestEnv();
+    env.clock.advance(const Duration(days: 3)); // 기본 데이터가 모두 사흘 전 일이 된다
+    await tester.pumpWidget(env.app);
+    await tester.pumpAndSettle();
+    addTearDown(env.deps.dispose);
+    await reveal(tester, find.text('오늘과 어제 처리한 소식이 없어요.'));
+    expect(find.textContaining('최근 소식 '), findsNothing, reason: '더 보기 링크도 없음');
+    expect(find.byKey(const Key('home_all_notifications')), findsOneWidget);
   });
 
   testWidgets('승인 탭: 응답이 필요한 요청이 먼저, 지난 요청은 분리되어 상태를 글자로 보여 준다', (tester) async {

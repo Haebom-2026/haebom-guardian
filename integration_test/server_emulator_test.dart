@@ -60,6 +60,12 @@ class _EmulatorServerApi implements GuardianServerApi {
   Future<void> ensureGuardianProfile({String? name}) async {}
 
   @override
+  Future<List<FamilyLink>> fetchLinks() async {
+    final snap = await db.collection('links').where('guardianId', isEqualTo: me).get();
+    return snap.docs.map((d) => FirestoreMappers.link(d.data())).toList();
+  }
+
+  @override
   Future<void> respondApproval(String approvalId, {required bool approve}) =>
       db.runTransaction((tx) async {
         final ref = db.doc('approvals/$approvalId');

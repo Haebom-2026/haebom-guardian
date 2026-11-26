@@ -13,6 +13,15 @@ class FakeServerApi implements GuardianServerApi {
     if (failWith != null) throw failWith!;
   }
 
+  /// [fetchLinks]가 돌려줄 목록
+  List<FamilyLink> links = [];
+
+  @override
+  Future<List<FamilyLink>> fetchLinks() async {
+    _call('links');
+    return List.of(links);
+  }
+
   @override
   Future<void> ensureGuardianProfile({String? name}) async => _call('profile');
   @override

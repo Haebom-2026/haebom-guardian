@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import '../models/approval_request.dart';
+import '../models/challenge.dart';
 import '../models/family_link.dart';
 import '../models/notification_item.dart';
 import '../models/sensitive_app.dart';
@@ -90,6 +91,7 @@ class MockBackend {
   final Map<String, ConnectCode> _codes = {};
   final Map<String, NotificationItem> _notifications = {};
   final Map<String, ApprovalRequest> _approvals = {};
+  final Map<String, Challenge> _challenges = {};
   final List<ElderDelivery> _elderInbox = [];
   final Map<String, int> _failedAttempts = {};
   final Map<String, DateTime> _lockedUntil = {};
@@ -278,6 +280,94 @@ class MockBackend {
   /// 고령자 앱에서 연결 해제 (`disconnect({guardianId})`, INTEGRATION_REVIEW #17).
   /// 보호자 쪽 해제와 결과가 같다: links 삭제 → 해당 보호자는 과거 알림·승인도 읽을 수 없다.
   void disconnectByElder(String elderId, String guardianId) => disconnect(guardianId, elderId);
+
+  // ======================= 가족의 도전 (💡 제안 단계) =======================
+
+  List<Challenge> challengesFor(String guardianId) => _challenges.values
+      .where((c) => _canRead(guardianId, c.elderId, c.guardianIds))
+      .toList()
+    ..sort((a, b) => b.at.compareTo(a.at));
+
+  Challenge challengeFor(String guardianId, String id) {
+    final c = _challenges[id];
+    if (c == null) throw const RepositoryException(RepositoryErrorCode.notFound);
+    if (!_canRead(guardianId, c.elderId, c.guardianIds)) {
+      throw const RepositoryException(RepositoryErrorCode.permissionDenied);
+    }
+    return c;
+  }
+
+  /// 보호자가 도전을 보낸다 (직접 쓴 이름·도움말). 서버도 같은 검사를 한다: 길이·막는 말·같은 도전 중복.
+  Challenge suggestChallenge(String guardianId, String elderId, String title, {String hint = ''}) {
+    if (!isLinked(elderId, guardianId)) throw const RepositoryException(RepositoryErrorCode.permissionDenied);
+    final problem = validateChallenge(title, hint);
+    if (problem != null) throw RepositoryException(RepositoryErrorCode.invalidArgument, problem);
+    final t = title.trim();
+    for (final c in _challenges.values) {
+      if (c.elderId == elderId && c.title == t && c.isActive) {
+        throw const RepositoryException(RepositoryErrorCode.invalidArgument, '이미 보낸 도전이에요.');
+      }
+    }
+    final c = Challenge(
+      id: _newId('challenge'),
+      elderId: elderId,
+      title: t,
+      hint: hint.trim(),
+      suggestedBy: guardianId,
+      guardianIds: _guardiansOf(elderId),
+      createdAt: now(),
+    );
+    _challenges[c.id] = c;
+    _notify();
+    return c;
+  }
+
+  Challenge? _elderSets(String id, ChallengeStatus from, ChallengeStatus to, {bool withHelp = false}) {
+    final c = _challenges[id];
+    if (c == null) return null;
+    final allowed = switch (to) {
+      ChallengeStatus.accepted => c.status == ChallengeStatus.sent || c.status == ChallengeStatus.later,
+      ChallengeStatus.later => c.status == ChallengeStatus.sent,
+      ChallengeStatus.done => c.status == ChallengeStatus.accepted,
+      ChallengeStatus.sent => false,
+    };
+    if (!allowed) return null;
+    final updated = to == ChallengeStatus.done
+        ? c.copyWith(status: to, completedAt: now(), withHelp: withHelp)
+        : c.copyWith(status: to);
+    _challenges[id] = updated;
+    _notify();
+    return updated;
+  }
+
+  /// 고령자 앱 시뮬레이션: [해 볼게요]
+  Challenge? acceptChallenge(String id) => _elderSets(id, ChallengeStatus.sent, ChallengeStatus.accepted);
+
+  /// 고령자 앱 시뮬레이션: [다음에 할게요] (보호자에게는 알리지 않는다. 나중에 [해 볼게요]를 누를 수 있다)
+  Challenge? postponeChallenge(String id) => _elderSets(id, ChallengeStatus.sent, ChallengeStatus.later);
+
+  /// 고령자 앱 시뮬레이션: [해냈어요!] (도우미 안내를 받았는지 여부만 전달)
+  Challenge? completeChallenge(String id, {bool withHelp = false}) =>
+      _elderSets(id, ChallengeStatus.accepted, ChallengeStatus.done, withHelp: withHelp);
+
+  /// 보호자가 보낸 도전 취소: 해내기 전(sent·later·accepted)이고 내가 보낸 것만. 목록에서 빠진다
+  /// (고령자 앱은 받은 목록을 그대로 따라간다. 어르신께 따로 알림은 가지 않는다).
+  void cancelChallenge(String guardianId, String id) {
+    final c = challengeFor(guardianId, id);
+    if (c.suggestedBy != guardianId) throw const RepositoryException(RepositoryErrorCode.permissionDenied, '내가 보낸 도전만 취소할 수 있어요.');
+    if (c.isDone) throw const RepositoryException(RepositoryErrorCode.invalidArgument, '이미 해낸 도전은 취소할 수 없어요.');
+    _challenges.remove(id);
+    _notify();
+  }
+
+  /// 해낸 도전에 칭찬 보내기 (보호자마다 한 번)
+  void cheerChallenge(String guardianId, String id, String message) {
+    final c = challengeFor(guardianId, id);
+    if (!c.isDone) throw const RepositoryException(RepositoryErrorCode.invalidArgument, '아직 해내지 않은 도전');
+    if (!cheerMessages.contains(message)) throw const RepositoryException(RepositoryErrorCode.invalidArgument);
+    _challenges[id] = c.copyWith(cheers: {...c.cheers, guardianId: message});
+    _notify();
+  }
 
   // ======================= 고령자 앱 시뮬레이션 =======================
 
@@ -471,6 +561,7 @@ class MockBackend {
     _codes.clear();
     _notifications.clear();
     _approvals.clear();
+    _challenges.clear();
     _elderInbox.clear();
     _failedAttempts.clear();
     _lockedUntil.clear();
@@ -558,5 +649,33 @@ class MockBackend {
         const Duration(days: 3));
     approval(momId, momG, SensitiveApp.kakaoBank, ApprovalStatus.cancelled,
         const Duration(days: 4));
+
+    // 가족의 도전: 어머니는 등본 떼기를 해냄(동생이 이미 칭찬), 아버지는 사진 보내기 도전 중, 어머니께 날씨 확인을 보냄
+    void challenge(String elder, List<String> g, String templateId, Duration ago,
+        {ChallengeStatus status = ChallengeStatus.sent,
+        Duration? doneAgo,
+        bool withHelp = false,
+        Map<String, String> cheers = const {}}) {
+      final tpl = ChallengeTemplate.byId(templateId)!;
+      final c = Challenge(
+        id: _newId('challenge'),
+        elderId: elder,
+        title: tpl.title,
+        hint: tpl.hint,
+        suggestedBy: g.first,
+        guardianIds: g,
+        createdAt: t.subtract(ago),
+        status: doneAgo == null ? status : ChallengeStatus.done,
+        completedAt: doneAgo == null ? null : t.subtract(doneAgo),
+        withHelp: withHelp,
+        cheers: cheers,
+      );
+      _challenges[c.id] = c;
+    }
+
+    challenge(momId, momG, 'gov24_resident', const Duration(days: 2),
+        doneAgo: const Duration(minutes: 90), withHelp: true, cheers: {siblingId: cheerMessages.first});
+    challenge(dadId, dadG, 'kakao_photo', const Duration(days: 1), status: ChallengeStatus.accepted);
+    challenge(momId, momG, 'weather', const Duration(hours: 3));
   }
 }

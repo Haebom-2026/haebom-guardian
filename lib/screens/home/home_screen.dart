@@ -14,6 +14,7 @@ import '../../repositories/guardian_repository.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
 import '../onboarding/notification_permission.dart';
+import 'challenge_section.dart';
 
 /// 홈: 처음 보는 보호자도 바로 알 수 있게
 /// ① 누구의 정보인지(가족) ② 지금 확인할 일(도움이 필요한 일) ③ 어떤 알림·요청이 있었는지(확인하지 않은 알림·최근 소식)
@@ -176,6 +177,9 @@ class HomeScreen extends StatelessWidget {
                             '확인하지 않은 알림 ${unreadNormal.length - _unreadLimit}건 더 보기',
                             () => deps.tabIndex.value = 1,
                           ),
+
+                        // 가족의 도전 (💡 제안 단계: 서버 규격이 없어 Mock 모드에서만 보인다)
+                        if (store.supportsChallenges) ChallengeSection(store: store, elderId: elder),
 
                         // ④ 최근 소식 (오늘·어제 확인한 알림·처리된 승인, 최대 3건. 더 있으면 알림 탭으로)
                         const SectionHeader('최근 소식'),

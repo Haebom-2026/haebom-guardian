@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../app/dependencies.dart';
 import '../../app/routes.dart';
 import '../../models/approval_request.dart';
+import '../../models/challenge.dart';
 import '../../models/sensitive_app.dart';
 import '../../models/sensitivity.dart';
 import '../../repositories/guardian_repository.dart';
@@ -404,6 +405,30 @@ class _DeveloperScreenState extends State<DeveloperScreen> {
                 ),
               ),
             ]),
+            const SectionHeader('⑦ 가족의 도전 (💡 제안)'),
+            Text('고령자 앱에서 어르신이 추천받은 도전을 해냈을 때를 흉내 냅니다. 해냈다는 사실만 전달됩니다.', style: t.textTheme.bodySmall),
+            const SizedBox(height: 8),
+            if (_b.challengesFor(MockBackend.meId).every((c) => c.isDone))
+              Text('진행 중인 도전 없음 (홈 "가족의 도전 → 도전 보내기"로 추가)', style: t.textTheme.bodySmall)
+            else
+              for (final c in _b.challengesFor(MockBackend.meId).where((c) => c.isActive)) ...[
+                Text('${_elderLabel(c.elderId)} · ${c.title} (${c.status.name})', style: t.textTheme.bodySmall),
+                const SizedBox(height: 6),
+                _buttons(dense: true, [
+                  if (!c.isAccepted) ...[
+                    ('해 볼게요', () => _elderChallenge(c.id, '해 볼게요', _b.acceptChallenge)),
+                    if (c.status == ChallengeStatus.sent)
+                      ('다음에 할게요', () => _elderChallenge(c.id, '다음에 할게요 (보호자에게 알리지 않음)', _b.postponeChallenge)),
+                  ] else ...[
+                    ('해냈어요!', () => _elderChallenge(c.id, '해냈어요', (id) => _b.completeChallenge(id))),
+                    (
+                      '도우미와 함께 해냈어요',
+                      () => _elderChallenge(c.id, '해냈어요 (도우미 안내와 함께)', (id) => _b.completeChallenge(id, withHelp: true)),
+                    ),
+                  ],
+                ]),
+                const SizedBox(height: 10),
+              ],
             const SectionHeader('⑥ 초기화 (18)'),
             OutlinedButton.icon(
               onPressed: _reset,
@@ -421,6 +446,11 @@ class _DeveloperScreenState extends State<DeveloperScreen> {
         ),
       ),
     );
+  }
+
+  void _elderChallenge(String id, String label, Challenge? Function(String id) action) {
+    final c = action(id);
+    _write(c == null ? '실패: 지금 상태에서는 할 수 없음' : '${_elderLabel(c.elderId)}: "${c.title}" → $label');
   }
 
   Widget _buttons(List<(String, VoidCallback)> items, {bool dense = false}) => Wrap(

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../models/approval_request.dart';
+import '../models/challenge.dart';
 import '../models/family_link.dart';
 import '../models/notification_item.dart';
 import 'guardian_repository.dart';
@@ -70,6 +71,23 @@ class MockGuardianRepository implements GuardianRepository {
 
   @override
   Future<void> disconnect(String elderId) => _call(() => backend.disconnect(guardianId, elderId));
+
+  @override
+  bool get supportsChallenges => true;
+
+  @override
+  Stream<List<Challenge>> watchChallenges() => _watch(() => backend.challengesFor(guardianId));
+
+  @override
+  Future<Challenge> suggestChallenge(String elderId, String title, {String hint = ''}) =>
+      _call(() => backend.suggestChallenge(guardianId, elderId, title, hint: hint));
+
+  @override
+  Future<void> cheerChallenge(String id, String message) =>
+      _call(() => backend.cheerChallenge(guardianId, id, message));
+
+  @override
+  Future<void> cancelChallenge(String id) => _call(() => backend.cancelChallenge(guardianId, id));
 
   /// Mock은 실시간으로 반영되므로 할 일 없음
   @override

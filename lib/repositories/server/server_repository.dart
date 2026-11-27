@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 
 import '../../models/approval_request.dart';
+import '../../models/challenge.dart';
 import '../../models/family_link.dart';
 import '../../models/notification_item.dart';
 import '../../models/sensitivity.dart';
@@ -347,6 +348,25 @@ class ServerGuardianRepository implements GuardianRepository {
   }
 
   /// 서버 API 방식: 가족·알림을 다시 조회 (Firestore 방식은 실시간이라 할 일 없음)
+  // 가족의 도전: 💡 제안 단계라 서버 규격이 없다. 서버 모드에서는 화면에서 숨긴다.
+  @override
+  bool get supportsChallenges => false;
+
+  @override
+  Stream<List<Challenge>> watchChallenges() => Stream.value(const []);
+
+  @override
+  Future<Challenge> suggestChallenge(String elderId, String title, {String hint = ''}) =>
+      Future.error(const RepositoryException(RepositoryErrorCode.unavailable, '서버에 도전 기능 없음'));
+
+  @override
+  Future<void> cheerChallenge(String id, String message) =>
+      Future.error(const RepositoryException(RepositoryErrorCode.unavailable, '서버에 도전 기능 없음'));
+
+  @override
+  Future<void> cancelChallenge(String id) =>
+      Future.error(const RepositoryException(RepositoryErrorCode.unavailable, '서버에 도전 기능 없음'));
+
   @override
   Future<void> refresh() async {
     if (!_apiMode) return;
